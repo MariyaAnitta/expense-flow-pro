@@ -362,7 +362,7 @@ app.post('/api/reconcile', async (req, res) => {
 });
 
 // SPA Routing: Serve index.html for any unknown routes
-app.get('*', (req, res) => {
+app.get('/{*path}', (req, res) => {
     // Only serve index.html if it's not an API call
     if (!req.path.startsWith('/api')) {
         res.sendFile(path.join(distPath, 'index.html'));
