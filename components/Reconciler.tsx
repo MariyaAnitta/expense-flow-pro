@@ -1,0 +1,365 @@
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { Expense, ReconciliationResult, ReconciliationReport } from '../types';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  ShieldCheck,
+  Search,
+  Loader2,
+  Zap,
+  Database,
+  Target,
+  FileQuestion,
+  Info,
+  RefreshCcw,
+  Globe,
+  FileSearch,
+  AlertCircle,
+  CalendarDays,
+  CreditCard,
+  Mail,
+  Receipt,
+  FileText
+} from 'lucide-react';
+import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
+
+interface ReconcilerProps {
+  expenses: Expense[];
+  reconciliation: ReconciliationResult | null;
+  isProcessing: boolean;
+  onSaveReport?: (report: ReconciliationReport) => void;
+  isSaving?: boolean;
+  saveSuccess?: boolean;
+  period: { month: string; year: number };
+}
+
+const Reconciler: React.FC<ReconcilerProps> = ({
+  expenses, reconciliation, isProcessing, onSaveReport, isSaving, saveSuccess, period
+}) => {
+  const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
+
+  useEffect(() => {
+    getExchangeRates().then(setExchangeData);
+  }, []);
+
+  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  const filteredData = useMemo(() => {
+    const rates = exchangeData?.rates || {};
+
+    /**
+     * ROBUST DATE MATCHER - Segment Based (YYYY-MM-DD)
+     */
+    const isTargetPeriod = (dateStr: string) => {
+      if (!dateStr) return false;
+      const parts = dateStr.split('-');
+      if (parts.length < 2) return false;
+
+      const y = parseInt(parts[0]);
+      const mIdx = parseInt(parts[1]) - 1;
+
+      const yearMatch = y === period.year;
+      const monthMatch = period.month === "All Months" || monthsList[mIdx] === period.month;
+
+      return yearMatch && monthMatch;
+    };
+
+    /**
+     * AUDIT ANCHOR ENGINE
+     */
+    const isAnchor = (e: Expense) => {
+      const src = String(e.source || '').toLowerCase().trim();
+      return src === 'bank_statement' || src === 'credit_card_statement';
+    };
+
+    const allAnchorsInPeriod = expenses.filter(e => isAnchor(e) && isTargetPeriod(e.date));
+    const totalVaultAnchors = expenses.filter(isAnchor);
+
+    // Prepare Expense Map for ID Lookups
+    const expenseMap = new Map<string, Expense>();
+    expenses.forEach(e => { if (e.id) expenseMap.set(String(e.id), e); });
+
+    // 1. Initial Matcher (AI Results)
+    let matchedPairs = (reconciliation?.matched || []).map(m => {
+      const bank = m.bankId ? expenseMap.get(String(m.bankId)) : null;
+      const receipt = (m.receiptId || m.emailId) ? expenseMap.get(String(m.receiptId || m.emailId || '')) : null;
+
+      /**
+       * FORENSIC AIR-GAP GUARD
+       * 1. Unique IDs: Never match an item to itself.
+       * 2. Source Integrity: Bank records can only match non-bank records.
+       */
+      if (!bank || !receipt || bank.id === receipt.id || isAnchor(receipt)) return null;
+
+      /**
+       * FORENSIC VALIDATION LAYER (Hard Guardrail)
+       * Use INR as Common Denominator for cross-currency parity.
+       */
+      const bDate = new Date(bank.date).getTime();
+      const rDate = new Date(receipt.date).getTime();
+      const diffDays = Math.abs(bDate - rDate) / (1000 * 60 * 60 * 24);
+
+      const bINR = convertToINR(bank.amount, bank.currency, rates);
+      const rINR = convertToINR(receipt.amount, receipt.currency, rates);
+
+      // FOR CROSS-CURRENCY: Allow 5% margin if AI suggested it
+      const sameCurrency = bank.currency === receipt.currency;
+      const sameAmt = sameCurrency ? Math.abs(bank.amount - receipt.amount) < 0.10 : Math.abs(bINR - rINR) < (bINR * 0.05);
+
+      // MERCHANT SYNONYM CHECK
+      const bMerc = bank.merchant.toLowerCase();
+      const rMerc = receipt.merchant.toLowerCase();
+      const isTele = (m: string) => m.includes('e&') || m.includes('etisalat');
+      const mercMatch = (isTele(bMerc) && isTele(rMerc)) || rMerc.includes(bMerc.substring(0, 4)) || bMerc.includes(rMerc.substring(0, 4));
+
+      if (diffDays > 7 || !sameAmt || !mercMatch) return null;
+
+      return { bank, receipt, label: m.proofLabel, summary: m.summary };
+    }).filter((pair): pair is { bank: Expense, receipt: Expense, label: string, summary: string } =>
+      pair !== null && isTargetPeriod(pair.bank.date)
+    );
+
+    // 2. Heuristic Fallback Matcher (±3 Day Clearance Window)
+    const matchedBankIds = new Set(matchedPairs.map(p => p.bank?.id).filter(Boolean));
+    const unmatchedAnchors = allAnchorsInPeriod.filter(b => !matchedBankIds.has(b.id));
+    const availableReceipts = expenses.filter(e => !isAnchor(e) && !matchedPairs.some(p => p.receipt?.id === e.id));
+
+    unmatchedAnchors.forEach(bankTx => {
+      // Find a forensic match: same amount + 3-day window + fuzzy merchant
+      const autoMatch = availableReceipts.find(rec => {
+        const bINR = convertToINR(bankTx.amount, bankTx.currency, rates);
+        const rINR = convertToINR(rec.amount, rec.currency, rates);
+
+        // Date Clearance Window Logic (±3 Day Clearance as per latest spec)
+        const bDate = new Date(bankTx.date).getTime();
+        const rDate = new Date(rec.date).getTime();
+        const diffDays = Math.abs(bDate - rDate) / (1000 * 60 * 60 * 24);
+        const withinWindow = diffDays <= 3;
+
+        // MERCHANT SYNONYM MATCHING
+        const bMerc = bankTx.merchant.toLowerCase();
+        const rMerc = rec.merchant.toLowerCase();
+        const isTele = (m: string) => m.includes('e&') || m.includes('etisalat');
+        const mercMatch = (isTele(bMerc) && isTele(rMerc)) || rMerc.includes(bMerc.substring(0, 4)) || bMerc.includes(rMerc.substring(0, 4));
+
+        // CURRENCY-AWARE PARITY
+        const sameCurrency = bankTx.currency === rec.currency;
+        const sameAmtVal = sameCurrency ? Math.abs(bankTx.amount - rec.amount) < 0.10 : Math.abs(bINR - rINR) < (bINR * 0.05);
+
+        // SOURCE INTEGRITY: Heuristic receipt must NOT be from a bank source
+        const validSource = !isAnchor(rec);
+
+        return sameAmtVal && withinWindow && mercMatch && validSource;
+      });
+
+      if (autoMatch) {
+        matchedPairs.push({
+          bank: bankTx,
+          receipt: autoMatch,
+          label: 'AUTO-VERIFIED (Forensic Match)',
+          summary: 'Verified via ±3 day clearance window heuristic match.'
+        });
+        matchedBankIds.add(bankTx.id);
+        const idx = availableReceipts.indexOf(autoMatch);
+        if (idx > -1) availableReceipts.splice(idx, 1);
+      }
+    });
+
+    const finalUnmatchedBankTx = allAnchorsInPeriod.filter(b => !matchedBankIds.has(b.id));
+
+    const mandatoryMissing: Expense[] = [];
+    const standardMissing: Expense[] = [];
+    const optionalMissing: Expense[] = [];
+
+    finalUnmatchedBankTx.forEach(exp => {
+      const amountINR = convertToINR(exp.amount, exp.currency, rates);
+      const merc = (exp.merchant || '').toLowerCase();
+      const cat = (exp.category || '').toLowerCase();
+
+      // 1. MANDATORY LOGIC
+      const isMandatory = ['travel', 'hotel', 'flight', 'airline', 'stay', 'flydubai', 'ibis', 'accommodation']
+        .some(k => merc.includes(k) || cat.includes(k));
+
+      // 2. OPTIONAL LOGIC (Threshold: 10 AED / ~225 INR)
+      const isOptional = ['bank charges', 'transfer', 'vat', 'tax', 'finance', 'charge']
+        .some(k => merc.includes(k) || cat.includes(k)) || amountINR < 225;
+
+      if (isMandatory) mandatoryMissing.push(exp);
+      else if (isOptional) optionalMissing.push(exp);
+      else standardMissing.push(exp);
+    });
+
+    const scoreDenominator = matchedPairs.length + mandatoryMissing.length + standardMissing.length;
+    const score = scoreDenominator > 0 ? Math.round((matchedPairs.length / scoreDenominator) * 100) : 100;
+
+    return {
+      matched: matchedPairs,
+      mandatoryMissing, standardMissing, optionalMissing,
+      stats: { matchedCount: matchedPairs.length, score, totalBankTx: allAnchorsInPeriod.length, totalVault: totalVaultAnchors.length },
+      fullReport: {
+        month: period.month,
+        year: period.year,
+        matched_transactions: matchedPairs.map(p => p.bank!).filter(Boolean),
+        mandatory_missing: mandatoryMissing,
+        optional_missing: optionalMissing,
+        standard_missing: standardMissing,
+        summary: {
+          total_matched: matchedPairs.length,
+          total_unmatched: finalUnmatchedBankTx.length,
+          compliance_score: score,
+          mandatory_error_count: mandatoryMissing.length,
+          warning_count: standardMissing.length,
+          optional_count: optionalMissing.length
+        }
+      } as ReconciliationReport
+    };
+  }, [reconciliation, expenses, exchangeData, period]);
+
+  if (isProcessing) return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="relative mb-8">
+        <Loader2 className="text-brand-600 animate-spin" size={80} />
+        <ShieldCheck className="absolute inset-0 m-auto text-brand-600" size={32} />
+      </div>
+      <h3 className="text-3xl font-black uppercase tracking-tight">Syncing Forensic Data</h3>
+      <p className="text-slate-500 mt-2 font-medium">Cross-referencing {period.month} {period.year} audit ledger...</p>
+    </div>
+  );
+
+  if (filteredData.stats.totalBankTx === 0) return (
+    <div className="max-w-4xl mx-auto py-20 px-8">
+      <div className="bg-white dark:bg-slate-900 rounded-[4rem] border border-slate-200 dark:border-slate-800 shadow-sm p-16 text-center">
+        <div className="w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-8 text-amber-600">
+          <AlertCircle size={48} />
+        </div>
+        <h3 className="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Audit Anchor Mismatch</h3>
+        <p className="text-slate-500 mt-4 mb-10 text-base font-medium max-w-lg mx-auto leading-relaxed">
+          The Auditor is scanning for <b>{period.month} {period.year}</b> bank records.
+          Upload a bank statement or credit card extract for this period to proceed.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-100 dark:border-slate-800 pt-10">
+          <div className="flex items-center gap-2 text-brand-600"><Database size={14} /> Synchronized Engine v4</div>
+          <div className="flex items-center gap-2"><CreditCard size={14} /> Source Parity Check</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-10 pb-20 animate-in fade-in duration-500">
+      <div className="bg-white dark:bg-[#0b1120] rounded-[3rem] p-12 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8">
+        <div className="space-y-2">
+          <div className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Compliance Integrity: {period.month} {period.year}</div>
+          <h3 className="text-5xl font-black tracking-tighter text-slate-900 dark:text-white">{filteredData.stats.score}% Accuracy</h3>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{filteredData.stats.matchedCount} Verified out of {filteredData.stats.totalBankTx} ledger entries</p>
+        </div>
+        <button
+          onClick={() => onSaveReport?.(filteredData.fullReport)}
+          disabled={isSaving || saveSuccess}
+          className="bg-brand-600 text-white px-12 py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl transition-all active:scale-95 disabled:opacity-50"
+        >
+          {isSaving ? 'Archiving...' : saveSuccess ? 'Snapshot Filed' : 'File Period Audit'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:scale-[1.02]">
+          <div className="text-emerald-500 font-black text-5xl tracking-tighter mb-1">{filteredData.stats.matchedCount}</div>
+          <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Verified</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:scale-[1.02]">
+          <div className="text-blue-500 font-black text-5xl tracking-tighter mb-1">{filteredData.optionalMissing.length}</div>
+          <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Optional</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:scale-[1.02]">
+          <div className="text-amber-500 font-black text-5xl tracking-tighter mb-1">{filteredData.standardMissing.length}</div>
+          <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">General</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:scale-[1.02]">
+          <div className="text-red-500 font-black text-5xl tracking-tighter mb-1">{filteredData.mandatoryMissing.length}</div>
+          <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Hard Gaps</div>
+        </div>
+      </div>
+
+      <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl">
+        <div className="px-10 py-6 bg-emerald-600 text-white flex items-center gap-4">
+          <CheckCircle2 size={24} />
+          <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Verified Ledger (Snapshot)</h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {filteredData.matched.length === 0 ? (
+                <tr><td className="p-12 text-center text-slate-400 font-medium italic">Scanning for proof matches in audit pool...</td></tr>
+              ) : filteredData.matched.map((pair, idx) => (
+                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                  <td className="px-12 py-8">
+                    <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px]">{pair.bank?.merchant}</div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">{pair.bank?.date} • {pair.bank?.category}</div>
+                  </td>
+                  <td className="px-12 py-8 text-center">
+                    <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border border-emerald-100 dark:border-emerald-500/20">
+                      PROOF VERIFIED
+                    </span>
+                  </td>
+                  <td className="px-12 py-8 text-right font-black text-slate-900 dark:text-white uppercase text-sm">
+                    {pair.bank?.currency} {pair.bank?.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {filteredData.mandatoryMissing.length > 0 && (
+        <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-red-200 dark:border-red-900 overflow-hidden shadow-sm">
+          <div className="px-10 py-6 bg-red-600 text-white flex items-center gap-4">
+            <AlertTriangle size={24} />
+            <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Mandatory Proof Required</h4>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {filteredData.mandatoryMissing.map(exp => (
+              <div key={exp.id} className="px-10 py-8 flex items-center justify-between hover:bg-red-50/20 transition-colors">
+                <div className="flex items-center gap-6">
+                  <div className="p-4 bg-red-50 dark:bg-red-500/10 rounded-2xl text-red-600"><Target size={20} /></div>
+                  <div>
+                    <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
+                    <div className="text-[10px] text-red-600 font-bold uppercase mt-1">{exp.category} • {exp.date}</div>
+                  </div>
+                </div>
+                <div className="text-right text-sm font-black text-red-700 dark:text-red-400 uppercase">{exp.currency} {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {filteredData.standardMissing.length > 0 && (
+        <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-amber-200 dark:border-amber-900 overflow-hidden shadow-sm">
+          <div className="px-10 py-6 bg-amber-500 text-white flex items-center gap-4">
+            <Search size={24} />
+            <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">General Evidence Missing</h4>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {filteredData.standardMissing.map(exp => (
+              <div key={exp.id} className="px-10 py-8 flex items-center justify-between hover:bg-amber-50/20 transition-colors">
+                <div className="flex items-center gap-6">
+                  <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl text-amber-500"><FileQuestion size={20} /></div>
+                  <div>
+                    <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
+                    <div className="text-[10px] text-amber-600 font-bold uppercase mt-1">{exp.date} • {exp.category}</div>
+                  </div>
+                </div>
+                <div className="text-right text-sm font-black text-slate-900 dark:text-white uppercase">{exp.currency} {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+};
+
+export default Reconciler;

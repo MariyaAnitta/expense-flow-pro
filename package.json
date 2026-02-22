@@ -1,0 +1,43 @@
+{
+  "name": "copy-of-expenseflow-ai",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "server": "npx tsx server.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "npm run server"
+  },
+  "dependencies": {
+    "@genkit-ai/ai": "^1.28.0",
+    "@genkit-ai/core": "^1.28.0",
+    "@genkit-ai/dotprompt": "^0.9.12",
+    "@genkit-ai/flow": "^0.5.17",
+    "@genkit-ai/googleai": "^1.28.0",
+    "@genkit-ai/vertexai": "^1.28.0",
+    "@google-cloud/vertexai": "^1.10.0",
+    "@google/genai": "^1.35.0",
+    "bcryptjs": "2.4.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "genkit": "^1.28.0",
+    "google-auth-library": "^10.5.0",
+    "lucide-react": "^0.563.0",
+    "node-fetch": "^2.7.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "tsx": "^4.21.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

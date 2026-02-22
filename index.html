@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" class="light h-full">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExpenseFlow Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+    rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#f0f4ff',
+              100: '#d9e2ff',
+              200: '#bacaff',
+              300: '#8da6ff',
+              400: '#5976ff',
+              500: '#334cff',
+              600: '#1a27ff',
+              700: '#141ceb',
+              800: '#1117be',
+              900: '#151b96',
+              950: '#0a0d5c',
+            }
+          },
+          borderRadius: {
+            '4xl': '2rem',
+            '5xl': '3rem',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .dark .glass-panel {
+      background: rgba(15, 23, 42, 0.7);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 10px;
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+      background: #334155;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+        "react": "https://esm.sh/react@^19.2.3",
+        "react-dom": "https://esm.sh/react-dom@^19.2.3",
+        "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
+        "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+        "bcryptjs": "https://esm.sh/bcryptjs@2.4.3",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+        "react/": "https://esm.sh/react@^19.2.3/"
+      }
+    }
+    </script>
+
+  <!-- Firebase SDK (v10.13.2) -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js';
+    import {
+      getFirestore, collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc,
+      Timestamp, getDocs, where, setDoc, getDoc, limit
+    } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDo4RbYxM2KFj8IuCYjVz2yvV-AoiOTCOE",
+      authDomain: "expense-management-syste-3a5f3.firebaseapp.com",
+      projectId: "expense-management-syste-3a5f3",
+      storageBucket: "expense-management-syste-3a5f3.firebasestorage.app",
+      messagingSenderId: "424295883109",
+      appId: "1:424295883109:web:38b33cdb08b093449d818c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.FirebaseSDK = {
+      db, collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc,
+      Timestamp, getDocs, where, setDoc, getDoc, limit
+    };
+  </script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body
+  class="h-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 overflow-hidden">
+  <div id="root" class="h-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

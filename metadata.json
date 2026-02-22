@@ -1,0 +1,7 @@
+{
+  "name": "Copy of ExpenseFlow AI",
+  "description": "An intelligent expense management assistant that extracts, organizes, and reconciles financial data from receipts, emails, and bank statements using Gemini AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

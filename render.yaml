@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: expense-flow-pro
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: VITE_GOOGLE_CLOUD_LOCATION
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FIREBASE_CONFIG
+        sync: false
