@@ -26,7 +26,7 @@ app.use(express.static(distPath));
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] 📥 INCOMING: ${req.method} ${req.url}`);
-    if (Object.keys(req.body).length > 0) {
+    if (req.body && Object.keys(req.body).length > 0) {
         console.log(`[${timestamp}] 📦 Payload keys: ${Object.keys(req.body).join(', ')}`);
     }
     next();
@@ -276,8 +276,8 @@ async function runReconciliationAgent(expenses: any[]) {
             proofLabel: z.string(),
             summary: z.string().describe("Brief forensic justification for the match")
         })),
-        unmatchedReceipts: z.array(z.string()),
-        unmatchedBankTransactions: z.array(z.string())
+        unmatchedReceipts: z.array(z.string()).optional().default([]),
+        unmatchedBankTransactions: z.array(z.string()).optional().default([])
     });
 
     const systemInstruction = `
