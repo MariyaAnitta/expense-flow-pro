@@ -55,15 +55,28 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promis
 }
 
 // --- GENKIT INIT ---
-// Initialize Genkit instance with Vertex AI using the user's specifics
+// Initialize Genkit instance with Vertex AI
+// On Render: set GOOGLE_CREDENTIALS_JSON to the full content of your service account JSON
+// Locally: GOOGLE_APPLICATION_CREDENTIALS file path still works as fallback
+let credentials: object | undefined;
+try {
+    const credsJson = process.env.GOOGLE_CREDENTIALS_JSON;
+    if (credsJson) {
+        credentials = JSON.parse(credsJson);
+        console.log('[Auth] Using inline GOOGLE_CREDENTIALS_JSON');
+    }
+} catch (e) {
+    console.warn('[Auth] Could not parse GOOGLE_CREDENTIALS_JSON, falling back to keyfile');
+}
+
 const ai = genkit({
     plugins: [
         vertexAI({
             location: process.env.VITE_GOOGLE_CLOUD_LOCATION || 'us-east1',
             projectId: process.env.VITE_GOOGLE_CLOUD_PROJECT || 'sivak-485711',
-            googleAuth: {
-                keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
-            }
+            googleAuth: credentials
+                ? { credentials }
+                : { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS }
         })
     ],
     model: gemini20Flash,
