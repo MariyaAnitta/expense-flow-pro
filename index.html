@@ -5,76 +5,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ExpenseFlow Pro</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
     rel="stylesheet">
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-          colors: {
-            brand: {
-              50: '#f0f4ff',
-              100: '#d9e2ff',
-              200: '#bacaff',
-              300: '#8da6ff',
-              400: '#5976ff',
-              500: '#334cff',
-              600: '#1a27ff',
-              700: '#141ceb',
-              800: '#1117be',
-              900: '#151b96',
-              950: '#0a0d5c',
-            }
-          },
-          borderRadius: {
-            '4xl': '2rem',
-            '5xl': '3rem',
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
 
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
-
-    .dark .glass-panel {
-      background: rgba(15, 23, 42, 0.7);
-    }
-
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #e2e8f0;
-      border-radius: 10px;
-    }
-
-    .dark ::-webkit-scrollbar-thumb {
-      background: #334155;
-    }
-  </style>
 
   <script type="importmap">
     {
@@ -116,7 +52,6 @@
       Timestamp, getDocs, where, setDoc, getDoc, limit
     };
   </script>
-  <link rel="stylesheet" href="/index.css">
 </head>
 
 <body
