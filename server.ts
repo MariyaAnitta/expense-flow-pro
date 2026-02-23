@@ -289,6 +289,8 @@ async function runReconciliationAgent(expenses: any[]) {
     - You MUST ONLY match an "ANCHOR" to a "PROOF". 
     - NEVER match an "ANCHOR" to another "ANCHOR".
     - NEVER match a "PROOF" to another "PROOF".
+    - UNIQUE MATCHING: Each bankId (ANCHOR) can be matched to at most one receiptId (PROOF).
+    - NO REPETITION: Do not list the same match more than once. If you run out of matches, stop.
 
     FORENSIC RULES:
     1. SOURCE INTEGRITY: Anchors are ground truth. Proofs are verification documents.
@@ -296,28 +298,71 @@ async function runReconciliationAgent(expenses: any[]) {
     3. DATE: +/- 7 days post/pre window.
     4. MERCHANT: Fuzzy match (e.g. "FLYDUBAI" == "FLYDUBAI DXB").
 
+    ANTI-HALLUCINATION:
+    - If you cannot find a match for an ANCHOR, do not invent one.
+    - If you find yourself repeating data or getting stuck in a loop, TERMINATE the JSON immediately.
+    - Keep 'summary' extremely concise (max 10 words).
+
     OUTPUT FORMAT: Return a "summary" for each match (e.g. "Fuzzy merchant match with 4-day gap").
-    INPUT: JSON list of expenses with 'role'.
-    OUTPUT: JSON list of matched IDs.
     `;
 
-    try {
-        return await retryWithBackoff(async () => {
-            const { output } = await ai.generate({
-                model: gemini20Flash,
-                prompt: `${systemInstruction}\n\nAUDIT POOL:\n${JSON.stringify(expenses)}`,
-                output: { format: 'json', schema: ReconciliationSchema },
-                config: {
-                    temperature: 0,
-                }
+    const anchors = expenses.filter(e => e.role === 'ANCHOR');
+    const proofs = expenses.filter(e => e.role === 'PROOF');
+
+    if (anchors.length === 0) return { matched: [], unmatchedReceipts: proofs.map(p => p.id), unmatchedBankTransactions: [] };
+
+    // BATCH CONFIGURATION
+    const BATCH_SIZE = 15;
+    const allMatches: any[] = [];
+    const unmatchedBankIds: string[] = [];
+
+    console.log(`[Reconcile] Starting batched audit. Total Anchors: ${anchors.length}, Total Proofs: ${proofs.map(p => p.id).length}`);
+
+    for (let i = 0; i < anchors.length; i += BATCH_SIZE) {
+        const currentBatch = anchors.slice(i, i + BATCH_SIZE);
+        const batchPool = [...currentBatch, ...proofs];
+
+        console.log(`[Reconcile] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(anchors.length / BATCH_SIZE)} (${currentBatch.length} anchors)`);
+
+        try {
+            const batchResult = await retryWithBackoff(async () => {
+                const { output } = await ai.generate({
+                    model: gemini20Flash,
+                    prompt: `${systemInstruction}\n\nAUDIT POOL (BATCH ${i / BATCH_SIZE}):\n${JSON.stringify(batchPool)}`,
+                    output: { format: 'json', schema: ReconciliationSchema },
+                    config: {
+                        temperature: 0,
+                    }
+                });
+                return output;
             });
-            return output;
-        });
-    } catch (e: any) {
-        console.error("DEBUG: Reconciliation Agent error after retries:", e);
-        logError(e);
-        throw e;
+
+            if (batchResult.matched) {
+                // Deduplication guard: ensure we don't add the same bankId twice across batches (though internal to batch should be unique)
+                batchResult.matched.forEach((match: any) => {
+                    if (!allMatches.some(m => m.bankId === match.bankId)) {
+                        allMatches.push(match);
+                    }
+                });
+            }
+        } catch (e: any) {
+            console.error(`[Reconcile] Batch ${i / BATCH_SIZE} failed:`, e.message);
+            // If a batch fails, we record the IDs as unmatched rather than failing the whole process
+            unmatchedBankIds.push(...currentBatch.map(a => a.id));
+        }
     }
+
+    const matchedBankIds = new Set(allMatches.map(m => m.bankId));
+    const matchedReceiptIds = new Set(allMatches.map(m => m.receiptId));
+
+    return {
+        matched: allMatches,
+        unmatchedReceipts: proofs.filter(p => !matchedReceiptIds.has(p.id)).map(p => p.id),
+        unmatchedBankTransactions: [
+            ...anchors.filter(a => !matchedBankIds.has(a.id)).map(a => a.id),
+            ...unmatchedBankIds
+        ]
+    };
 }
 
 // --- ROUTES ---
