@@ -117,7 +117,10 @@ const Reconciler: React.FC<ReconcilerProps> = ({
         rMerc.includes(bMerc.substring(0, 4)) ||
         bMerc.includes(rMerc.substring(0, 4));
 
-      if (diffDays > 7 || !sameAmt || !mercMatch) return null;
+      const isHotel = bank.category.toLowerCase().includes('lodging') || bank.category.toLowerCase().includes('hotel') || receipt.category.toLowerCase().includes('lodging') || receipt.category.toLowerCase().includes('hotel');
+      const maxDays = isHotel ? 14 : 7;
+
+      if (diffDays > maxDays || !sameAmt || !mercMatch) return null;
 
       return { bank, receipt, label: m.proofLabel, summary: m.summary };
     }).filter((pair): pair is { bank: Expense, receipt: Expense, label: string, summary: string } =>

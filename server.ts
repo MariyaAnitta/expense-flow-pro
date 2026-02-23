@@ -295,10 +295,11 @@ async function runReconciliationAgent(expenses: any[]) {
     FORENSIC RULES:
     1. SOURCE INTEGRITY: Anchors are ground truth. Proofs are verification documents.
     2. AMOUNT & CURRENCY: Match even if amounts differ slightly (< 1%) or if currencies differ (e.g., 1 OMR ≈ 9.53 AED). 
-    3. DATE: +/- 7 days post/pre window.
+    3. DATE: +/- 7 days post/pre window. For "Lodging" or "Hotel" categories, allow up to +/- 14 days (due to stay duration).
     4. MERCHANT: Fuzzy match (e.g. "FLYDUBAI" == "FLYDUBAI DXB").
        - SPECIAL CASE: "ROAD & TRANSPORT AUTHO" matches with "DUBAI METRO" or "RTA Metro".
        - SPECIAL CASE: "CAREEM HALA" matches with "Hala Taxi".
+       - SPECIAL CASE: "HOTEL IBIS DEIRA CITY" matches "Ibis Deira Creekside Dubai".
 
     ANTI-HALLUCINATION:
     - If you cannot find a match for an ANCHOR, do not invent one.
