@@ -297,6 +297,8 @@ async function runReconciliationAgent(expenses: any[]) {
     2. AMOUNT & CURRENCY: Match even if amounts differ slightly (< 1%) or if currencies differ (e.g., 1 OMR ≈ 9.53 AED). 
     3. DATE: +/- 7 days post/pre window.
     4. MERCHANT: Fuzzy match (e.g. "FLYDUBAI" == "FLYDUBAI DXB").
+       - SPECIAL CASE: "ROAD & TRANSPORT AUTHO" matches with "DUBAI METRO" or "RTA Metro".
+       - SPECIAL CASE: "CAREEM HALA" matches with "Hala Taxi".
 
     ANTI-HALLUCINATION:
     - If you cannot find a match for an ANCHOR, do not invent one.

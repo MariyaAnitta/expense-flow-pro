@@ -111,7 +111,11 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       const bMerc = bank.merchant.toLowerCase();
       const rMerc = receipt.merchant.toLowerCase();
       const isTele = (m: string) => m.includes('e&') || m.includes('etisalat');
-      const mercMatch = (isTele(bMerc) && isTele(rMerc)) || rMerc.includes(bMerc.substring(0, 4)) || bMerc.includes(rMerc.substring(0, 4));
+      const isRTA = (m: string) => m.includes('rta') || m.includes('road & transport') || m.includes('dubai metro') || m.includes('hala taxi');
+      const mercMatch = (isTele(bMerc) && isTele(rMerc)) ||
+        (isRTA(bMerc) && isRTA(rMerc)) ||
+        rMerc.includes(bMerc.substring(0, 4)) ||
+        bMerc.includes(rMerc.substring(0, 4));
 
       if (diffDays > 7 || !sameAmt || !mercMatch) return null;
 
@@ -141,7 +145,11 @@ const Reconciler: React.FC<ReconcilerProps> = ({
         const bMerc = bankTx.merchant.toLowerCase();
         const rMerc = rec.merchant.toLowerCase();
         const isTele = (m: string) => m.includes('e&') || m.includes('etisalat');
-        const mercMatch = (isTele(bMerc) && isTele(rMerc)) || rMerc.includes(bMerc.substring(0, 4)) || bMerc.includes(rMerc.substring(0, 4));
+        const isRTA = (m: string) => m.includes('rta') || m.includes('road & transport') || m.includes('dubai metro') || m.includes('hala taxi');
+        const mercMatch = (isTele(bMerc) && isTele(rMerc)) ||
+          (isRTA(bMerc) && isRTA(rMerc)) ||
+          rMerc.includes(bMerc.substring(0, 4)) ||
+          bMerc.includes(rMerc.substring(0, 4));
 
         // CURRENCY-AWARE PARITY
         const sameCurrency = bankTx.currency === rec.currency;
