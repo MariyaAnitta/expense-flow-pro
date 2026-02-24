@@ -46,6 +46,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [previews, setPreviews] = useState<FilePreview[]>([]);
+  const [selectedBank, setSelectedBank] = useState<string>('Amex');
   const [successCount, setSuccessCount] = useState<{ expenses: number, travel: number } | null>(null);
 
   const formatSize = (bytes: number) => {
@@ -168,7 +169,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
           await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        const res = await batchExtractAllData(chunk);
+        const res = await batchExtractAllData(chunk, selectedBank);
         allExpenses.push(...res.expenses);
         allTravelLogs.push(...res.travelLogs);
       }
@@ -232,6 +233,25 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
           </div>
           <h3 className="text-3xl font-black tracking-tighter uppercase">Intelligent Audit Feed</h3>
           <p className="text-sm text-slate-500 mt-2 font-medium">Extracting financial proof with native AI precision.</p>
+
+          {/* BANK SELECTION BAR */}
+          <div className="mt-10 flex flex-col items-center">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Target Account / Bank</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {['Amex', 'Citi', 'HSBC', 'Standard Chartered', 'Other'].map(bank => (
+                <button
+                  key={bank}
+                  onClick={() => setSelectedBank(bank)}
+                  className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border ${selectedBank === bank
+                      ? 'bg-brand-600 text-white border-brand-600 shadow-lg shadow-brand-500/20 scale-105'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700 hover:border-brand-300'
+                    }`}
+                >
+                  {bank}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className={`relative border-2 border-dashed rounded-[3rem] p-12 transition-all ${previews.length > 0

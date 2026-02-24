@@ -20,7 +20,9 @@ import {
   CreditCard,
   Mail,
   Receipt,
-  FileText
+  FileText,
+  Plus,
+  ChevronRight
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
 
@@ -28,14 +30,24 @@ interface ReconcilerProps {
   expenses: Expense[];
   reconciliation: ReconciliationResult | null;
   isProcessing: boolean;
-  onSaveReport?: (report: ReconciliationReport) => void;
+  onSaveReport: (report: ReconciliationReport) => Promise<void>;
   isSaving?: boolean;
   saveSuccess?: boolean;
   period: { month: string; year: number };
+  auditBank?: string;
+  onBankChange?: (bank: string) => void;
 }
 
 const Reconciler: React.FC<ReconcilerProps> = ({
-  expenses, reconciliation, isProcessing, onSaveReport, isSaving, saveSuccess, period
+  expenses,
+  reconciliation,
+  isProcessing,
+  period,
+  onSaveReport,
+  isSaving,
+  saveSuccess,
+  auditBank = "All Accounts",
+  onBankChange
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
 
@@ -124,7 +136,9 @@ const Reconciler: React.FC<ReconcilerProps> = ({
 
       return { bank, receipt, label: m.proofLabel, summary: m.summary };
     }).filter((pair): pair is { bank: Expense, receipt: Expense, label: string, summary: string } =>
-      pair !== null && isTargetPeriod(pair.bank.date)
+      pair !== null &&
+      isTargetPeriod(pair.bank.date) &&
+      (auditBank === "All Accounts" || pair.bank.bank === auditBank)
     );
 
     // 2. Heuristic Fallback Matcher (±3 Day Clearance Window)
@@ -229,7 +243,7 @@ const Reconciler: React.FC<ReconcilerProps> = ({
         }
       } as ReconciliationReport
     };
-  }, [reconciliation, expenses, exchangeData, period]);
+  }, [reconciliation, expenses, exchangeData, period, auditBank]);
 
   if (isProcessing) return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -261,16 +275,35 @@ const Reconciler: React.FC<ReconcilerProps> = ({
     </div>
   );
 
+  const complianceScore = filteredData.stats.score;
+
   return (
     <div className="space-y-10 pb-20 animate-in fade-in duration-500">
       <div className="bg-white dark:bg-[#0b1120] rounded-[3rem] p-12 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8">
         <div className="space-y-2">
           <div className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Compliance Integrity: {period.month} {period.year}</div>
-          <h3 className="text-5xl font-black tracking-tighter text-slate-900 dark:text-white">{filteredData.stats.score}% Accuracy</h3>
+          <div className="flex items-baseline gap-4">
+            <h3 className="text-6xl font-black tracking-tighter uppercase whitespace-nowrap">
+              {complianceScore}% Accuracy
+            </h3>
+
+            <div className="relative group">
+              <select
+                value={auditBank}
+                onChange={(e) => onBankChange?.(e.target.value)}
+                className="appearance-none bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 px-6 pr-12 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+              >
+                {["All Accounts", "Amex", "Citi", "HSBC", "Standard Chartered", "Other"].map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+              <ChevronRight size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none rotate-90" />
+            </div>
+          </div>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{filteredData.stats.matchedCount} Verified out of {filteredData.stats.totalBankTx} ledger entries</p>
         </div>
         <button
-          onClick={() => onSaveReport?.(filteredData.fullReport)}
+          onClick={() => onSaveReport(filteredData.fullReport)}
           disabled={isSaving || saveSuccess}
           className="bg-brand-600 text-white px-12 py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl transition-all active:scale-95 disabled:opacity-50"
         >

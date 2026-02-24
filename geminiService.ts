@@ -19,7 +19,8 @@ async function handleApiResponse(response: Response) {
  * Calls the Genkit Agent backend to extract data from multiple documents in one batch.
  */
 export const batchExtractAllData = async (
-  inputs: Array<{ content: string | { data: string; mimeType: string }, source: ExpenseSource }>
+  inputs: Array<{ content: string | { data: string; mimeType: string }, source: ExpenseSource }>,
+  bankName?: string
 ): Promise<{ expenses: Expense[], travelLogs: TravelLog[] }> => {
 
   const payloadInputs = inputs.map(input => {
@@ -58,7 +59,8 @@ export const batchExtractAllData = async (
         currency: item.c || "AED",
         date: item.d || new Date().toISOString().split('T')[0],
         category: item.cat || "General",
-        description: source === 'bank_statement' || source === 'credit_card_statement' ? "BANK TRANSACTION" : "PROOF DOCUMENT",
+        description: source === 'bank_statement' || source === 'credit_card_statement' ? `${bankName || 'BANK'} TRANSACTION` : "PROOF DOCUMENT",
+        bank: bankName,
         source,
         confidence: 1.0,
         created_at: new Date().toISOString()
@@ -121,9 +123,10 @@ export const batchExtractAllData = async (
  */
 export const extractAllData = async (
   content: string | { data: string; mimeType: string },
-  source: ExpenseSource
+  source: ExpenseSource,
+  bankName?: string
 ): Promise<{ expenses: Expense[], travelLogs: TravelLog[] }> => {
-  return batchExtractAllData([{ content, source }]);
+  return batchExtractAllData([{ content, source }], bankName);
 };
 
 /**

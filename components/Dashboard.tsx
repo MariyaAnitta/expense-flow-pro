@@ -36,6 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, onDelete, period, onNav
   const [filterCategory, setFilterCategory] = useState("All Categories");
   const [filterStatus, setFilterStatus] = useState("All Status");
   const [filterSource, setFilterSource] = useState("All Sources");
+  const [filterBank, setFilterBank] = useState("All Banks");
 
   useEffect(() => {
     getExchangeRates().then(setExchangeData);
@@ -136,7 +137,11 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, onDelete, period, onNav
         (filterSource === "Email Alert" && e.source === "email");
       if (!matchesSource) return false;
 
-      // 6. Legacy Type Filter (if still needed)
+      // 6. Bank Filter
+      const matchesBank = filterBank === "All Banks" || e.bank === filterBank;
+      if (!matchesBank) return false;
+
+      // 7. Legacy Type Filter (if still needed)
       const matchesType = selectedTypeFilter === "All Types" || e.expense_type === selectedTypeFilter;
       if (!matchesType) return false;
 
@@ -312,6 +317,12 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, onDelete, period, onNav
                 value: filterSource,
                 setter: setFilterSource,
                 options: ['All Sources', 'Receipt', 'Web Document', 'Bank Statement', 'Credit Card Statement', 'Telegram Bot', 'Email Alert']
+              },
+              {
+                label: 'ALL BANKS',
+                value: filterBank,
+                setter: setFilterBank,
+                options: ['All Banks', 'Amex', 'Citi', 'HSBC', 'Standard Chartered', 'Other']
               }
             ].map((filter, i) => (
               <div key={i} className="relative group">
@@ -373,7 +384,10 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, onDelete, period, onNav
                     <td className="px-12 py-6">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{e.merchant}</span>
+                          <span className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                            {e.merchant}
+                            {e.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({e.bank})</span>}
+                          </span>
                           {isVerified && (
                             <span className="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border border-emerald-100 dark:border-emerald-500/20">
                               <ShieldCheck size={8} className="inline mr-1" /> Verified

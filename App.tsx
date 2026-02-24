@@ -55,6 +55,7 @@ const App: React.FC = () => {
   const [targetClarifyId, setTargetClarifyId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>("October");
   const [selectedYear, setSelectedYear] = useState<number>(2025);
+  const [auditBank, setAuditBank] = useState<string>("Amex");
 
   const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -159,7 +160,11 @@ const App: React.FC = () => {
         if (parts.length < 2) return false;
         const eYear = parseInt(parts[0]);
         const eMonthIndex = parseInt(parts[1]) - 1;
-        return eYear === selectedYear && (selectedMonth === "All Months" || monthsList[eMonthIndex] === selectedMonth);
+
+        const periodMatch = eYear === selectedYear && (selectedMonth === "All Months" || monthsList[eMonthIndex] === selectedMonth);
+        const bankMatch = auditBank === "All Accounts" || e.bank === auditBank;
+
+        return periodMatch && bankMatch;
       });
 
       // 2. PROOF POOL: Everything else (Receipts, Telegram, etc.)
@@ -238,6 +243,10 @@ const App: React.FC = () => {
               <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="bg-transparent text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 px-4 py-2 outline-none">
                 {[2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026].map(y => <option key={y} value={y} className="dark:bg-[#0b1120]">{y}</option>)}
               </select>
+              <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+              <select value={auditBank} onChange={(e) => setAuditBank(e.target.value)} className="bg-transparent text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 px-4 py-2 outline-none">
+                {["All Accounts", "Amex", "Citi", "HSBC", "Standard Chartered", "Other"].map(b => <option key={b} value={b} className="dark:bg-[#0b1120]">{b}</option>)}
+              </select>
             </div>
             <button onClick={toggleFullscreen} className="p-3 text-slate-500 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-all shadow-sm border border-slate-200 dark:border-slate-800/60">{isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}</button>
             <button
@@ -256,7 +265,7 @@ const App: React.FC = () => {
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={travelLogs} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.CLARIFY && <ClarificationCenter expenses={expenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />}
-            {activeTab === AppTab.RECONCILE && <Reconciler expenses={expenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} />}
+            {activeTab === AppTab.RECONCILE && <Reconciler expenses={expenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} />}
             {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} />}
           </div>
         </section>
