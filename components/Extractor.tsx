@@ -46,7 +46,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [previews, setPreviews] = useState<FilePreview[]>([]);
-  const [selectedBank, setSelectedBank] = useState<string>('Amex');
+  const [selectedBank, setSelectedBank] = useState<string>('');
   const [successCount, setSuccessCount] = useState<{ expenses: number, travel: number } | null>(null);
 
   const formatSize = (bytes: number) => {
@@ -145,7 +145,8 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
       }
       return {
         content: extractionInput,
-        source: activeMode === 'receipt' ? 'web_upload' : activeMode
+        source: activeMode === 'receipt' ? 'web_upload' : activeMode,
+        bank: (activeMode === 'bank_statement' || activeMode === 'credit_card_statement') ? selectedBank : ''
       };
     });
 
@@ -243,8 +244,8 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
                   key={bank}
                   onClick={() => setSelectedBank(bank)}
                   className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border ${selectedBank === bank
-                      ? 'bg-brand-600 text-white border-brand-600 shadow-lg shadow-brand-500/20 scale-105'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700 hover:border-brand-300'
+                    ? 'bg-brand-600 text-white border-brand-600 shadow-lg shadow-brand-500/20 scale-105'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700 hover:border-brand-300'
                     }`}
                 >
                   {bank}
@@ -336,7 +337,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
         <div className="mt-12">
           <button
             onClick={processContent}
-            disabled={isProcessing || previews.length === 0}
+            disabled={isProcessing || previews.length === 0 || ((activeMode === 'bank_statement' || activeMode === 'credit_card_statement') && !selectedBank)}
             className="w-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 py-6 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] transition-all disabled:opacity-50 flex items-center justify-center gap-5 shadow-2xl active:scale-[0.98]"
           >
             {isProcessing ? <><Loader2 className="animate-spin" size={28} /> Ingesting Data...</> : <><Sparkles size={28} /> Start Batch Extraction <ArrowRight size={28} /></>}

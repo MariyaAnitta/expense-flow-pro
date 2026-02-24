@@ -85,8 +85,15 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       return src === 'bank_statement' || src === 'credit_card_statement';
     };
 
-    const allAnchorsInPeriod = expenses.filter(e => isAnchor(e) && isTargetPeriod(e.date));
-    const totalVaultAnchors = expenses.filter(isAnchor);
+    const allAnchorsInPeriod = expenses.filter(e =>
+      isAnchor(e) &&
+      isTargetPeriod(e.date) &&
+      (auditBank === "All Accounts" || e.bank === auditBank)
+    );
+    const totalVaultAnchors = expenses.filter(e =>
+      isAnchor(e) &&
+      (auditBank === "All Accounts" || e.bank === auditBank)
+    );
 
     // Prepare Expense Map for ID Lookups
     const expenseMap = new Map<string, Expense>();
@@ -343,7 +350,10 @@ const Reconciler: React.FC<ReconcilerProps> = ({
               ) : filteredData.matched.map((pair, idx) => (
                 <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
                   <td className="px-12 py-8">
-                    <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px]">{pair.bank?.merchant}</div>
+                    <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px]">
+                      {pair.bank?.merchant}
+                      {pair.bank?.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({pair.bank.bank})</span>}
+                    </div>
                     <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">{pair.bank?.date} • {pair.bank?.category}</div>
                   </td>
                   <td className="px-12 py-8 text-center">
@@ -396,8 +406,13 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                 <div className="flex items-center gap-6">
                   <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl text-amber-500"><FileQuestion size={20} /></div>
                   <div>
-                    <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
-                    <div className="text-[10px] text-amber-600 font-bold uppercase mt-1">{exp.date} • {exp.category}</div>
+                    <div className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm">
+                      {exp.merchant}
+                      {exp.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({exp.bank})</span>}
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-400">
+                      {exp.date} • {exp.category}
+                    </div>
                   </div>
                 </div>
                 <div className="text-right text-sm font-black text-slate-900 dark:text-white uppercase">{exp.currency} {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>

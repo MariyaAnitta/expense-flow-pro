@@ -261,7 +261,7 @@ const App: React.FC = () => {
         </header>
         <section className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] dark:bg-[#020617]">
           <div className="max-w-screen-2xl mx-auto">
-            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={expenses} onDelete={removeExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={handleJumpToClarify} />}
+            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={expenses} onDelete={removeExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={handleJumpToClarify} filterBank={auditBank} onFilterBankChange={setAuditBank} />}
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={travelLogs} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.CLARIFY && <ClarificationCenter expenses={expenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />}

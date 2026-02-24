@@ -27,16 +27,24 @@ interface DashboardProps {
   onDelete: (id: string) => void;
   period: { month: string; year: number };
   onNavigateToClarify?: (expenseId: string) => void;
+  filterBank: string;
+  onFilterBankChange: (bank: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ expenses, onDelete, period, onNavigateToClarify }) => {
+const Dashboard: React.FC<DashboardProps> = ({
+  expenses,
+  onDelete,
+  period,
+  onNavigateToClarify,
+  filterBank,
+  onFilterBankChange
+}) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("All Types");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("All Categories");
   const [filterStatus, setFilterStatus] = useState("All Status");
   const [filterSource, setFilterSource] = useState("All Sources");
-  const [filterBank, setFilterBank] = useState("All Banks");
 
   useEffect(() => {
     getExchangeRates().then(setExchangeData);
@@ -321,8 +329,8 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, onDelete, period, onNav
               {
                 label: 'ALL BANKS',
                 value: filterBank,
-                setter: setFilterBank,
-                options: ['All Banks', 'Amex', 'Citi', 'HSBC', 'Standard Chartered', 'Other']
+                setter: onFilterBankChange,
+                options: ['All Accounts', 'Amex', 'Citi', 'HSBC', 'Standard Chartered', 'Other']
               }
             ].map((filter, i) => (
               <div key={i} className="relative group">
