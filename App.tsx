@@ -55,7 +55,7 @@ const App: React.FC = () => {
   const [targetClarifyId, setTargetClarifyId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>("October");
   const [selectedYear, setSelectedYear] = useState<number>(2025);
-  const [auditBank, setAuditBank] = useState<string>("Amex");
+  const [auditBank, setAuditBank] = useState<string>("All Accounts");
 
   const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 

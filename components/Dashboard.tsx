@@ -146,7 +146,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (!matchesSource) return false;
 
       // 6. Bank Filter
-      const matchesBank = filterBank === "All Banks" || e.bank === filterBank;
+      const matchesBank = filterBank === "All Accounts" || e.bank === filterBank;
       if (!matchesBank) return false;
 
       // 7. Legacy Type Filter (if still needed)
@@ -157,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
 
     return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, period, selectedTypeFilter, searchQuery, filterCategory, filterStatus, filterSource]);
+  }, [expenses, period, selectedTypeFilter, searchQuery, filterCategory, filterStatus, filterSource, filterBank]);
 
   const stats = useMemo(() => {
     const rates = exchangeData?.rates || {};
