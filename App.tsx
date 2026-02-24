@@ -232,7 +232,7 @@ const App: React.FC = () => {
         </div>
       </aside>
       <main className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="h-20 flex items-center justify-between px-10 bg-white/80 dark:bg-[#0b1120]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/60 shrink-0 z-30">
+        <header className="h-20 flex items-center justify-between px-6 bg-white/80 dark:bg-[#0b1120]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/60 shrink-0 z-30">
           <div className="flex items-center gap-6"><button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl"><Menu /></button><h2 className="text-lg font-black tracking-tight uppercase">{activeTab.toUpperCase()}</h2></div>
           <div className="flex items-center gap-4">
             <div className="hidden lg:flex items-center gap-3 bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800/60 mr-2">
@@ -259,8 +259,8 @@ const App: React.FC = () => {
             </button>
           </div>
         </header>
-        <section className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] dark:bg-[#020617]">
-          <div className="max-w-screen-2xl mx-auto">
+        <section className="flex-1 overflow-y-auto p-6 bg-[#f8fafc] dark:bg-[#020617]">
+          <div className="max-w-screen-xl mx-auto">
             {activeTab === AppTab.DASHBOARD && <Dashboard expenses={expenses} onDelete={removeExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={handleJumpToClarify} filterBank={auditBank} onFilterBankChange={setAuditBank} />}
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={travelLogs} period={{ month: selectedMonth, year: selectedYear }} />}

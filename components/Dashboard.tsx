@@ -389,7 +389,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 return (
                   <tr key={e.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 group transition-all">
-                    <td className="px-12 py-6">
+                    <td className="px-8 py-6">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
@@ -452,25 +452,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                         )}
                       </div>
                     </td>
-                    <td className="px-12 py-6">
+                    <td className="px-8 py-6">
                       <div className="flex flex-col gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
                         <div className="flex items-center gap-2"><Clock size={14} className="opacity-30" /> {e.date}</div>
                         <div className="ml-5 opacity-60">{e.time || formatTime(e.created_at)}</div>
                       </div>
                     </td>
-                    <td className="px-12 py-6">
+                    <td className="px-8 py-6">
                       <span className="px-4 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
                         {e.category}
                       </span>
                     </td>
-                    <td className="px-12 py-6">
+                    <td className="px-8 py-6">
                       <div className="flex flex-col">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.currency}</span>
                         <span className="text-sm font-black text-slate-900 dark:text-white">{e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         <span className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest mt-0.5">Gross Value</span>
                       </div>
                     </td>
-                    <td className="px-12 py-6">
+                    <td className="px-8 py-6">
                       <div className="flex items-center gap-3">
                         <div className={`p-2.5 rounded-xl ${e.source === 'telegram' ? 'bg-sky-50 dark:bg-sky-500/10' :
                           e.source === 'email' ? 'bg-pink-50 dark:bg-pink-500/10' :

@@ -25,6 +25,9 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface ReconcilerProps {
   expenses: Expense[];
@@ -50,6 +53,54 @@ const Reconciler: React.FC<ReconcilerProps> = ({
   onBankChange
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
+
+  const downloadAsPDF = () => {
+    const doc = new jsPDF();
+    const title = `Expense Audit Report: ${period.month} ${period.year}`;
+    const bankFilter = auditBank === "All Accounts" ? "Overall Portfolio" : `${auditBank} Account`;
+
+    doc.setFontSize(22);
+    doc.text("ExpenseFlow Intelligence", 14, 20);
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`${title} | ${bankFilter}`, 14, 30);
+    doc.text(`Compliance Accuracy: ${filteredData.stats.score}%`, 14, 38);
+
+    const tableData = filteredData.matched.map(p => [
+      p.bank?.date || '',
+      p.bank?.merchant || '',
+      p.bank?.category || '',
+      `${p.bank?.currency} ${p.bank?.amount.toLocaleString()}`,
+      p.label || 'Verified'
+    ]);
+
+    (doc as any).autoTable({
+      startY: 45,
+      head: [['Date', 'Merchant', 'Category', 'Amount', 'Status']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [26, 39, 255] }
+    });
+
+    doc.save(`Audit_${period.month}_${period.year}_${auditBank.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  const downloadAsExcel = () => {
+    const data = filteredData.matched.map(p => ({
+      Date: p.bank?.date,
+      Merchant: p.bank?.merchant,
+      Category: p.bank?.category,
+      Amount: p.bank?.amount,
+      Currency: p.bank?.currency,
+      Status: p.label,
+      Bank: p.bank?.bank || auditBank
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Verified Ledger");
+    XLSX.writeFile(workbook, `Audit_${period.month}_${period.year}_${auditBank.replace(/\s+/g, '_')}.xlsx`);
+  };
 
   useEffect(() => {
     getExchangeRates().then(setExchangeData);
@@ -285,12 +336,12 @@ const Reconciler: React.FC<ReconcilerProps> = ({
   const complianceScore = filteredData.stats.score;
 
   return (
-    <div className="space-y-10 pb-20 animate-in fade-in duration-500">
-      <div className="bg-white dark:bg-[#0b1120] rounded-[3rem] p-12 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8">
+    <div className="space-y-8 pb-20 animate-in fade-in duration-500">
+      <div className="bg-white dark:bg-[#0b1120] rounded-[3rem] p-8 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8">
         <div className="space-y-2">
           <div className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Compliance Integrity: {period.month} {period.year}</div>
           <div className="flex items-baseline gap-4">
-            <h3 className="text-6xl font-black tracking-tighter uppercase whitespace-nowrap">
+            <h3 className="text-4xl lg:text-5xl font-black tracking-tighter uppercase whitespace-nowrap">
               {complianceScore}% Accuracy
             </h3>
 
@@ -309,13 +360,29 @@ const Reconciler: React.FC<ReconcilerProps> = ({
           </div>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{filteredData.stats.matchedCount} Verified out of {filteredData.stats.totalBankTx} ledger entries</p>
         </div>
-        <button
-          onClick={() => onSaveReport(filteredData.fullReport)}
-          disabled={isSaving || saveSuccess}
-          className="bg-brand-600 text-white px-12 py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl transition-all active:scale-95 disabled:opacity-50"
-        >
-          {isSaving ? 'Archiving...' : saveSuccess ? 'Snapshot Filed' : 'File Period Audit'}
-        </button>
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            onClick={() => onSaveReport(filteredData.fullReport)}
+            disabled={isSaving || saveSuccess}
+            className="bg-brand-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isSaving ? 'Archiving...' : saveSuccess ? 'Snapshot Filed' : 'File Period Audit'}
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={downloadAsPDF}
+              className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2"
+            >
+              <FileText size={14} /> PDF
+            </button>
+            <button
+              onClick={downloadAsExcel}
+              className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-2"
+            >
+              <Plus size={14} /> Excel
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -371,57 +438,61 @@ const Reconciler: React.FC<ReconcilerProps> = ({
         </div>
       </section>
 
-      {filteredData.mandatoryMissing.length > 0 && (
-        <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-red-200 dark:border-red-900 overflow-hidden shadow-sm">
-          <div className="px-10 py-6 bg-red-600 text-white flex items-center gap-4">
-            <AlertTriangle size={24} />
-            <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Mandatory Proof Required</h4>
-          </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-            {filteredData.mandatoryMissing.map(exp => (
-              <div key={exp.id} className="px-10 py-8 flex items-center justify-between hover:bg-red-50/20 transition-colors">
-                <div className="flex items-center gap-6">
-                  <div className="p-4 bg-red-50 dark:bg-red-500/10 rounded-2xl text-red-600"><Target size={20} /></div>
-                  <div>
-                    <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
-                    <div className="text-[10px] text-red-600 font-bold uppercase mt-1">{exp.category} • {exp.date}</div>
+      {
+        filteredData.mandatoryMissing.length > 0 && (
+          <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-red-200 dark:border-red-900 overflow-hidden shadow-sm">
+            <div className="px-10 py-6 bg-red-600 text-white flex items-center gap-4">
+              <AlertTriangle size={24} />
+              <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Mandatory Proof Required</h4>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {filteredData.mandatoryMissing.map(exp => (
+                <div key={exp.id} className="px-10 py-8 flex items-center justify-between hover:bg-red-50/20 transition-colors">
+                  <div className="flex items-center gap-6">
+                    <div className="p-4 bg-red-50 dark:bg-red-500/10 rounded-2xl text-red-600"><Target size={20} /></div>
+                    <div>
+                      <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
+                      <div className="text-[10px] text-red-600 font-bold uppercase mt-1">{exp.category} • {exp.date}</div>
+                    </div>
                   </div>
+                  <div className="text-right text-sm font-black text-red-700 dark:text-red-400 uppercase">{exp.currency} {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                 </div>
-                <div className="text-right text-sm font-black text-red-700 dark:text-red-400 uppercase">{exp.currency} {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+              ))}
+            </div>
+          </section>
+        )
+      }
 
-      {filteredData.standardMissing.length > 0 && (
-        <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-amber-200 dark:border-amber-900 overflow-hidden shadow-sm">
-          <div className="px-10 py-6 bg-amber-500 text-white flex items-center gap-4">
-            <Search size={24} />
-            <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">General Evidence Missing</h4>
-          </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-            {filteredData.standardMissing.map(exp => (
-              <div key={exp.id} className="px-10 py-8 flex items-center justify-between hover:bg-amber-50/20 transition-colors">
-                <div className="flex items-center gap-6">
-                  <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl text-amber-500"><FileQuestion size={20} /></div>
-                  <div>
-                    <div className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm">
-                      {exp.merchant}
-                      {exp.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({exp.bank})</span>}
-                    </div>
-                    <div className="text-[10px] font-bold text-slate-400">
-                      {exp.date} • {exp.category}
+      {
+        filteredData.standardMissing.length > 0 && (
+          <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-amber-200 dark:border-amber-900 overflow-hidden shadow-sm">
+            <div className="px-10 py-6 bg-amber-500 text-white flex items-center gap-4">
+              <Search size={24} />
+              <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">General Evidence Missing</h4>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {filteredData.standardMissing.map(exp => (
+                <div key={exp.id} className="px-10 py-8 flex items-center justify-between hover:bg-amber-50/20 transition-colors">
+                  <div className="flex items-center gap-6">
+                    <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl text-amber-500"><FileQuestion size={20} /></div>
+                    <div>
+                      <div className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm">
+                        {exp.merchant}
+                        {exp.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({exp.bank})</span>}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-400">
+                        {exp.date} • {exp.category}
+                      </div>
                     </div>
                   </div>
+                  <div className="text-right text-sm font-black text-slate-900 dark:text-white uppercase">{exp.currency} {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                 </div>
-                <div className="text-right text-sm font-black text-slate-900 dark:text-white uppercase">{exp.currency} {exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
+              ))}
+            </div>
+          </section>
+        )
+      }
+    </div >
   );
 };
 
