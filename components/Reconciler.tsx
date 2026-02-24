@@ -138,11 +138,15 @@ const Reconciler: React.FC<ReconcilerProps> = ({
         const bINR = convertToINR(bankTx.amount, bankTx.currency, rates);
         const rINR = convertToINR(rec.amount, rec.currency, rates);
 
-        // Date Clearance Window Logic (±3 Day Clearance as per latest spec)
+        // Date Clearance Window Logic
         const bDate = new Date(bankTx.date).getTime();
         const rDate = new Date(rec.date).getTime();
         const diffDays = Math.abs(bDate - rDate) / (1000 * 60 * 60 * 24);
-        const withinWindow = diffDays <= 3;
+
+        const isHotel = (bankTx.category || '').toLowerCase().includes('hotel') || (bankTx.category || '').toLowerCase().includes('lodging') ||
+          (rec.category || '').toLowerCase().includes('hotel') || (rec.category || '').toLowerCase().includes('lodging');
+        const maxDays = isHotel ? 14 : 3;
+        const withinWindow = diffDays <= maxDays;
 
         // MERCHANT SYNONYM MATCHING
         const bMerc = bankTx.merchant.toLowerCase();
