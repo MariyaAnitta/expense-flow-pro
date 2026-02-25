@@ -53,15 +53,15 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
 
       <div className="w-full max-w-lg relative z-10 flex flex-col items-center py-10">
         {/* Logo Section - Optimized vertical footprint */}
-        <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-1000 text-center">
-          <div className="bg-brand-600 p-5 rounded-[1.75rem] text-white shadow-3xl shadow-brand-500/20 mb-6 scale-110">
-            <TrendingUp size={40} strokeWidth={2.5} />
+        <div className="flex flex-col items-center mb-6 animate-in fade-in slide-in-from-top-4 duration-1000 text-center">
+          <div className="bg-brand-600 p-4 rounded-[1.5rem] text-white shadow-3xl shadow-brand-500/20 mb-4 scale-100">
+            <TrendingUp size={32} strokeWidth={2.5} />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">ExpenseFlow <span className="text-brand-600">Pro</span></h1>
-          <p className="text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase tracking-[0.4em] mt-4 max-w-[200px] leading-relaxed">Intelligence First Audit Engine</p>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">ExpenseFlow <span className="text-brand-600">Pro</span></h1>
+          <p className="text-slate-400 dark:text-slate-500 font-bold text-[9px] uppercase tracking-[0.4em] mt-3 max-w-[200px] leading-relaxed text-center">Intelligence First Audit Engine</p>
         </div>
 
-        <div className="w-full bg-white dark:bg-slate-900 p-10 rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-none animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="w-full bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-none animate-in fade-in slide-in-from-bottom-8 duration-700">
           {mode !== 'reset' ? (
             <div className="flex bg-slate-50 dark:bg-slate-950 p-2 rounded-3xl mb-10 border border-slate-100 dark:border-slate-800">
               <button

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 interface ReconcilerProps {
@@ -74,7 +74,7 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       p.label || 'Verified'
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 45,
       head: [['Date', 'Merchant', 'Category', 'Amount', 'Status']],
       body: tableData,
