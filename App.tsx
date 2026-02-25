@@ -213,7 +213,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] flex font-sans text-slate-900 dark:text-slate-100">
+    <div className="h-screen bg-slate-50 dark:bg-[#020617] flex font-sans overflow-hidden text-slate-900 dark:text-slate-100">
       {isSidebarOpen && <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
       <aside className={`fixed md:relative z-50 w-72 h-full bg-white dark:bg-[#0b1120] border-r border-slate-200 dark:border-slate-800/60 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex flex-col h-full p-6">

@@ -224,8 +224,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Stat Cards - Matching Image Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-brand-600 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden flex flex-col justify-between h-48">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-brand-600 p-6 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden flex flex-col justify-between h-40">
           <div className="absolute top-0 right-0 p-8 opacity-20"><Banknote size={80} /></div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Portfolio Burn</p>
@@ -236,9 +236,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#0b1120] p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-48">
-          <div className="flex justify-between items-start mb-4">
-            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500"><Receipt size={24} /></div>
+        <div className="bg-white dark:bg-[#0b1120] p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-40">
+          <div className="flex justify-between items-start mb-2">
+            <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500"><Receipt size={20} /></div>
             <div className="text-right">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Document Scan</p>
               <h4 className="text-3xl font-black tracking-tighter">{(stats.sources.receipt || 0) + (stats.sources.web_upload || 0)}</h4>
@@ -249,9 +249,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#0b1120] p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-48">
-          <div className="flex justify-between items-start mb-4">
-            <div className="w-12 h-12 bg-sky-50 dark:bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-500"><Send size={24} /></div>
+        <div className="bg-white dark:bg-[#0b1120] p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-40">
+          <div className="flex justify-between items-start mb-2">
+            <div className="w-10 h-10 bg-sky-50 dark:bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-500"><Send size={20} /></div>
             <div className="text-right">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mobile Bot</p>
               <h4 className="text-3xl font-black tracking-tighter">{stats.sources.telegram || 0}</h4>
@@ -262,9 +262,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#0b1120] p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-48">
-          <div className="flex justify-between items-start mb-4">
-            <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500"><CreditCard size={24} /></div>
+        <div className="bg-white dark:bg-[#0b1120] p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-40">
+          <div className="flex justify-between items-start mb-2">
+            <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500"><CreditCard size={20} /></div>
             <div className="text-right">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Financial Vault</p>
               <h4 className="text-3xl font-black tracking-tighter">{(stats.sources.credit_card_statement || 0) + (stats.sources.bank_statement || 0) + (stats.sources.email || 0)}</h4>
@@ -277,10 +277,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Ledger Section */}
-      <div className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden">
-        <div className="px-12 py-10 flex items-center justify-between border-b border-slate-50 dark:border-slate-800">
-          <div className="flex items-center gap-5">
-            <div className="p-4 bg-brand-50 dark:bg-brand-500/10 rounded-2xl text-brand-600"><PieChart size={24} /></div>
+      <div className="bg-white dark:bg-[#0b1120] rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden">
+        <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50 dark:border-slate-800">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-brand-50 dark:bg-brand-500/10 rounded-2xl text-brand-600"><PieChart size={20} /></div>
             <div>
               <h3 className="text-xl font-black tracking-tighter uppercase">Transaction Ledger</h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Immutable Financial Records</p>
@@ -294,7 +294,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* REACTIVE FILTER BAR - Glassmorphism UI */}
-        <div className="px-12 py-8 flex flex-wrap items-center gap-4 bg-slate-50/50 dark:bg-slate-900/30 backdrop-blur-xl border-b border-slate-50 dark:border-slate-800/60">
+        <div className="px-8 py-6 flex flex-wrap items-center gap-4 bg-slate-50/50 dark:bg-slate-900/30 backdrop-blur-xl border-b border-slate-50 dark:border-slate-800/60">
           <div className="flex-1 min-w-[300px] relative">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input

@@ -46,12 +46,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-slate-50 dark:bg-slate-950 p-6 relative transition-colors duration-300">
+    <div className="h-screen flex flex-col items-center bg-slate-50 dark:bg-slate-950 p-6 relative overflow-y-auto transition-colors duration-300">
       {/* Premium Background Effects - Immersive but subtle */}
       <div className="absolute top-[-25%] right-[-15%] w-[70%] h-[70%] bg-brand-500/10 rounded-full blur-[160px] animate-pulse"></div>
       <div className="absolute bottom-[-15%] left-[-15%] w-[60%] h-[60%] bg-indigo-500/10 rounded-full blur-[140px] animate-pulse delay-700"></div>
 
-      <div className="w-full max-w-lg relative z-10 flex flex-col items-center py-10">
+      <div className="w-full max-w-lg relative z-10 flex flex-col items-center py-4">
         {/* Logo Section - Optimized vertical footprint */}
         <div className="flex flex-col items-center mb-3 animate-in fade-in slide-in-from-top-4 duration-1000 text-center">
           <div className="bg-brand-600 p-3 rounded-2xl text-white shadow-3xl shadow-brand-500/20 mb-3">
