@@ -46,35 +46,35 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 relative overflow-y-auto transition-colors duration-300">
+    <div className="min-h-screen flex flex-col items-center bg-slate-50 dark:bg-slate-950 p-6 relative transition-colors duration-300">
       {/* Premium Background Effects - Immersive but subtle */}
       <div className="absolute top-[-25%] right-[-15%] w-[70%] h-[70%] bg-brand-500/10 rounded-full blur-[160px] animate-pulse"></div>
       <div className="absolute bottom-[-15%] left-[-15%] w-[60%] h-[60%] bg-indigo-500/10 rounded-full blur-[140px] animate-pulse delay-700"></div>
 
       <div className="w-full max-w-lg relative z-10 flex flex-col items-center py-10">
         {/* Logo Section - Optimized vertical footprint */}
-        <div className="flex flex-col items-center mb-6 animate-in fade-in slide-in-from-top-4 duration-1000 text-center">
-          <div className="bg-brand-600 p-4 rounded-[1.5rem] text-white shadow-3xl shadow-brand-500/20 mb-4 scale-100">
-            <TrendingUp size={32} strokeWidth={2.5} />
+        <div className="flex flex-col items-center mb-3 animate-in fade-in slide-in-from-top-4 duration-1000 text-center">
+          <div className="bg-brand-600 p-3 rounded-2xl text-white shadow-3xl shadow-brand-500/20 mb-3">
+            <TrendingUp size={28} strokeWidth={2.5} />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">ExpenseFlow <span className="text-brand-600">Pro</span></h1>
-          <p className="text-slate-400 dark:text-slate-500 font-bold text-[9px] uppercase tracking-[0.4em] mt-3 max-w-[200px] leading-relaxed text-center">Intelligence First Audit Engine</p>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">ExpenseFlow <span className="text-brand-600">Pro</span></h1>
+          <p className="text-slate-400 dark:text-slate-500 font-bold text-[8px] uppercase tracking-[0.4em] mt-2 max-w-[200px] leading-relaxed text-center">Intelligence First Audit Engine</p>
         </div>
 
-        <div className="w-full bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-none animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="w-full bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-none animate-in fade-in slide-in-from-bottom-8 duration-700">
           {mode !== 'reset' ? (
-            <div className="flex bg-slate-50 dark:bg-slate-950 p-2 rounded-3xl mb-10 border border-slate-100 dark:border-slate-800">
+            <div className="flex bg-slate-50 dark:bg-slate-950 p-1 rounded-2xl mb-6 border border-slate-100 dark:border-slate-800">
               <button
                 onClick={() => { setMode('login'); setError(null); setSuccessMsg(null); }}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${mode === 'login' ? 'bg-white dark:bg-slate-800 text-brand-600 dark:text-white shadow-xl shadow-slate-200/50 dark:shadow-none' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all ${mode === 'login' ? 'bg-white dark:bg-slate-800 text-brand-600 dark:text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >
-                <LogIn size={16} /> Enter
+                <LogIn size={14} /> Enter
               </button>
               <button
                 onClick={() => { setMode('signup'); setError(null); setSuccessMsg(null); }}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${mode === 'signup' ? 'bg-white dark:bg-slate-800 text-brand-600 dark:text-white shadow-xl shadow-slate-200/50 dark:shadow-none' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all ${mode === 'signup' ? 'bg-white dark:bg-slate-800 text-brand-600 dark:text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >
-                <UserPlus size={16} /> Create
+                <UserPlus size={14} /> Create
               </button>
             </div>
           ) : (
@@ -86,15 +86,15 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
             </button>
           )}
 
-          <div className="mb-8">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase">
+          <div className="mb-6">
+            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">
               {mode === 'login' && 'Authorized Access'}
               {mode === 'signup' && 'Register Asset'}
               {mode === 'reset' && 'Security Reset'}
             </h2>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2">Endpoint Identity</label>
               <div className="relative group">
@@ -107,7 +107,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@expenseflow.pro"
-                  className="w-full pl-14 pr-6 py-5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-3xl text-sm font-bold focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
                 />
               </div>
             </div>
@@ -135,7 +135,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
                     value={recoveryPhrase}
                     onChange={(e) => setRecoveryPhrase(e.target.value)}
                     placeholder="e.g. Blue Moon Coffee 1989"
-                    className="w-full pl-14 pr-6 py-5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-3xl text-sm font-bold focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
+                    className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
                   />
                 </div>
               </div>
@@ -155,7 +155,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-14 pr-6 py-5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-3xl text-sm font-bold focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
                 />
               </div>
               {mode === 'login' && (
@@ -188,24 +188,24 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-brand-600 hover:bg-brand-700 text-white py-6 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl shadow-brand-500/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4 group"
+              className="w-full bg-brand-600 hover:bg-brand-700 text-white py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl shadow-brand-500/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4 group"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="animate-spin" size={20} />
+                  <Loader2 className="animate-spin" size={18} />
                   Verifying...
                 </>
               ) : (
                 <>
-                  <Sparkles size={20} className="group-hover:rotate-12 transition-transform" />
+                  <Sparkles size={18} className="group-hover:rotate-12 transition-transform" />
                   {mode === 'login' ? 'Initiate Session' : mode === 'signup' ? 'Finalize Account' : 'Commit Change'}
-                  <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
           </form>
 
-          <p className="mt-12 text-center text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] leading-loose">
+          <p className="mt-8 text-center text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] leading-loose">
             Enterprise grade security enabled.<br />
             <span className="text-brand-600 cursor-pointer">View Network Protocol</span>
           </p>
