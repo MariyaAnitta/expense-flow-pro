@@ -216,7 +216,7 @@ const App: React.FC = () => {
     <div className="h-screen bg-slate-50 dark:bg-[#020617] flex font-sans overflow-hidden text-slate-900 dark:text-slate-100">
       {isSidebarOpen && <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
       <aside className={`fixed md:relative z-50 w-72 h-full bg-white dark:bg-[#0b1120] border-r border-slate-200 dark:border-slate-800/60 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex flex-col h-full p-6">
+        <div className="flex flex-col h-full p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-12 px-2"><div className="flex items-center gap-3"><div className="bg-brand-600 p-2.5 rounded-2xl text-white"><TrendingUp size={22} /></div><span className="text-xl font-black tracking-tighter">ExpenseFlow</span></div><button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400"><X /></button></div>
           <nav className="flex-1 space-y-2">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-4 mb-4">Operations</div>
