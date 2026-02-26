@@ -70,8 +70,8 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     });
   }, [logs, period]);
 
-  // FORENSIC MATCHING ENGINE: Robust check for financial anchors + Best Match Ranking
-  const getFinancialMatch = (log: TravelLog | null, type: 'flight' | 'accommodation') => {
+  // FORENSIC MATCHING ENGINE: Robust check for financial anchors + Scoped Proof Matching
+  const getFinancialMatch = (log: TravelLog | null, type: 'flight' | 'accommodation', specificProof?: Expense | null) => {
     if (!log || !exchangeData) return null;
 
     const rates = exchangeData.rates || {};
@@ -86,7 +86,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     const isHotel = type === 'accommodation';
     const lProv = (log.provider_name || "").toLowerCase().substring(0, 4);
 
-    // 1. Find all merchant candidates
+    // 1. Find all merchant candidates within the logical window
     const candidates = anchors.filter(bankTx => {
       const bDate = new Date(bankTx.date).getTime();
       const diffDays = Math.abs(bDate - lDate) / (1000 * 60 * 60 * 24);
@@ -100,23 +100,31 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
 
     if (candidates.length === 0) return null;
 
-    // 2. BEST MATCH SELECTION
-    // If we have a proof document (hotel invoice), prioritize the CLOSEST AMOUNT
-    const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
-    const docMatch = proofs.find(p => p.merchant.toLowerCase().includes(lProv) || lProv.includes(p.merchant.toLowerCase().substring(0, 4)));
+    // 2. SCOPED PROOF RANKING
+    // Only use proof amounts that are logically part of this trip's timeline
+    let bestProof = specificProof;
+    if (!bestProof && !isHotel) {
+      // For flights, if no specific proof is passed, look for proof docs (receipts) only within 3 days of departure
+      const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
+      bestProof = proofs.find(p => {
+        const pDate = new Date(p.date).getTime();
+        const pMerc = p.merchant.toLowerCase();
+        return Math.abs(pDate - lDate) < (3 * 86400000) && (pMerc.includes(lProv) || lProv.includes(pMerc.substring(0, 4)));
+      });
+    }
 
-    if (docMatch) {
-      const pINR = convertToINR(docMatch.amount, docMatch.currency, rates);
+    if (bestProof) {
+      const pINR = convertToINR(bestProof.amount, bestProof.currency, rates);
       return [...candidates].sort((a, b) => {
         const aINR = convertToINR(a.amount, a.currency, rates);
         const bINR = convertToINR(b.amount, b.currency, rates);
         const aDiff = Math.abs(aINR - pINR);
         const bDiff = Math.abs(bINR - pINR);
-        return aDiff - bDiff; // Sort by closest amount
+        return aDiff - bDiff; // Sort by amount precision
       })[0];
     }
 
-    // Otherwise, pick the CLOSEST DATE
+    // Default to closest date
     return [...candidates].sort((a, b) => {
       const aDiff = Math.abs(new Date(a.date).getTime() - lDate);
       const bDiff = Math.abs(new Date(b.date).getTime() - lDate);
@@ -168,8 +176,13 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
       if (linkedHotelExpense?.id) usedHotelExpenseIds.add(linkedHotelExpense.id);
 
+      // 2. HIGH-PRECISION MATCHING: Pass the exact proof doc found for this trip
       const fMatch = getFinancialMatch(flight, 'flight');
-      const hMatch = getFinancialMatch(linkedHotel || (linkedHotelExpense ? { start_date: linkedHotelExpense.date, provider_name: linkedHotelExpense.merchant, travel_type: 'accommodation' } as any : null), 'accommodation');
+      const hMatch = getFinancialMatch(
+        linkedHotel || (linkedHotelExpense ? { start_date: linkedHotelExpense.date, provider_name: linkedHotelExpense.merchant, travel_type: 'accommodation' } as any : null),
+        'accommodation',
+        linkedHotelExpense // Pass the raw expense proof if it was the source
+      );
 
       result.push({
         id: flight.id,
