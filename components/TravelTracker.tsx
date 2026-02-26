@@ -1,7 +1,8 @@
 
-import React, { useMemo, useState } from 'react';
-import { TravelLog } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { TravelLog, Expense } from '../types';
 import { isHomeLocation } from '../firebaseService';
+import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
 import {
   Plane,
   MapPin,
@@ -21,6 +22,7 @@ import {
 
 interface TravelTrackerProps {
   logs: TravelLog[];
+  expenses: Expense[];
   period: { month: string; year: number };
 }
 
@@ -37,9 +39,14 @@ type JurisdictionSegment = {
   provider: string;
 };
 
-const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
+const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period }) => {
   const [filter, setFilter] = useState<'all' | 'verified' | 'action_required'>('all');
+  const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
   const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  useEffect(() => {
+    getExchangeRates().then(setExchangeData);
+  }, []);
 
   const filteredLogs = useMemo(() => {
     return logs.filter(log => {
@@ -50,6 +57,56 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
       return matchesPeriod;
     });
   }, [logs, period]);
+
+  // FORENSIC MATCHING ENGINE: Shared with Dashboard
+  const verifyStay = (log: TravelLog | null): boolean => {
+    if (!log || !exchangeData) return false;
+    if (log.hotel_verification_status === 'verified') return true;
+
+    const rates = exchangeData.rates || {};
+    const anchors = expenses.filter(e => {
+      const src = String(e.source || '').toLowerCase().trim();
+      return src === 'bank_statement' || src === 'credit_card_statement';
+    });
+
+    // Check for a financial match in the bank statement pool
+    // We allow matching against ANY bank record, even in the next month.
+    return anchors.some(bankTx => {
+      const bDate = new Date(bankTx.date).getTime();
+      const lDate = new Date(log.start_date).getTime();
+
+      // Amount / Sub-Category check is only reliable for hotels
+      if (log.travel_type !== 'accommodation') return false;
+
+      // 1. Window Parity (14 days for hotels)
+      const diffDays = Math.abs(bDate - lDate) / (1000 * 60 * 60 * 24);
+      if (diffDays > 14) return false;
+
+      // 2. Merchant Parity
+      const bMerc = bankTx.merchant.toLowerCase();
+      const lProv = log.provider_name.toLowerCase();
+      const mercMatch = lProv.includes(bMerc.substring(0, 4)) || bMerc.includes(lProv.substring(0, 4));
+      if (!mercMatch) return false;
+
+      // 3. Amount Parity (Handle currency conversion)
+      // Note: We don't have the amount on the TravelLog object here, 
+      // but if the merchant and date match closely, and we see an expense 
+      // for this stay in the proofs, it's strong enough.
+      // However, we want to match BANK -> HOTEL. 
+      // We'll search for a "Proof" expense that matches this hotel first.
+      const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
+      const docMatch = proofs.find(p => p.merchant.toLowerCase().includes(lProv.substring(0, 4)) || lProv.includes(p.merchant.toLowerCase().substring(0, 4)));
+
+      if (docMatch) {
+        const bINR = convertToINR(bankTx.amount, bankTx.currency, rates);
+        const pINR = convertToINR(docMatch.amount, docMatch.currency, rates);
+        const sameCurrency = bankTx.currency === docMatch.currency;
+        return sameCurrency ? Math.abs(bankTx.amount - docMatch.amount) < 0.10 : Math.abs(bINR - pINR) < (bINR * 0.05);
+      }
+
+      return false;
+    });
+  };
 
   // CORE LOGIC: Group logs into Jurisdiction Segments (Trips)
   const segments = useMemo(() => {
@@ -69,6 +126,8 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
 
       if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
 
+      const isVerified = verifyStay(linkedHotel || null);
+
       result.push({
         id: flight.id,
         country: flight.destination_country || "Unknown",
@@ -78,15 +137,14 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
         endDate: flight.return_date || flight.end_date || flight.start_date,
         flight: flight,
         hotel: linkedHotel || null,
-        status: (flight.status === 'Complete' && linkedHotel && flight.hotel_verification_status === 'verified')
-          ? 'verified'
-          : 'action_required',
+        status: isVerified ? 'verified' : 'action_required',
         provider: flight.provider_name
       });
     });
 
     // 2. Process Standalone Hotels (Stationary Anchors)
     hotelLogs.filter(h => h.document_id && !usedHotelDocIds.has(h.document_id)).forEach(hotel => {
+      const isVerified = verifyStay(hotel);
       result.push({
         id: hotel.id,
         country: hotel.destination_country || "International",
@@ -96,13 +154,13 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
         endDate: hotel.end_date || hotel.start_date,
         flight: null,
         hotel: hotel,
-        status: (hotel.hotel_verification_status === 'verified') ? 'verified' : 'action_required',
+        status: isVerified ? 'verified' : 'action_required',
         provider: hotel.provider_name
       });
     });
 
     return result.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-  }, [filteredLogs]);
+  }, [filteredLogs, expenses, exchangeData]);
 
   const auditStats = useMemo(() => {
     const total = segments.length;
@@ -250,8 +308,8 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
 
             {/* Status Footer */}
             <div className={`px-10 py-5 transition-all duration-500 flex items-center justify-between ${segment.status === 'verified'
-                ? 'bg-emerald-500 text-white shadow-[0_-10px_20px_-5px_rgba(16,185,129,0.2)]'
-                : 'bg-slate-50 dark:bg-slate-800/80 text-slate-400 border-t border-slate-100 dark:border-slate-800'
+              ? 'bg-emerald-500 text-white shadow-[0_-10px_20px_-5px_rgba(16,185,129,0.2)]'
+              : 'bg-slate-50 dark:bg-slate-800/80 text-slate-400 border-t border-slate-100 dark:border-slate-800'
               }`}>
               <div className="flex items-center gap-3">
                 {segment.status === 'verified' ? <ShieldCheck size={18} /> : <ShieldAlert size={18} className="text-orange-500" />}

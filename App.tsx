@@ -274,7 +274,7 @@ const App: React.FC = () => {
           <div className="max-w-screen-xl mx-auto">
             {activeTab === AppTab.DASHBOARD && <Dashboard expenses={expenses} onDelete={removeExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={handleJumpToClarify} filterBank={auditBank} onFilterBankChange={setAuditBank} />}
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
-            {activeTab === AppTab.TRAVEL && <TravelTracker logs={travelLogs} period={{ month: selectedMonth, year: selectedYear }} />}
+            {activeTab === AppTab.TRAVEL && <TravelTracker logs={travelLogs} expenses={expenses} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.CLARIFY && <ClarificationCenter expenses={expenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />}
             {activeTab === AppTab.RECONCILE && <Reconciler expenses={expenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} />}
             {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} />}
