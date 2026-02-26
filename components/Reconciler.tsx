@@ -82,11 +82,53 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       headStyles: { fillColor: [26, 39, 255] }
     });
 
+    let currentY = (doc as any).lastAutoTable.finalY + 15;
+
+    if (filteredData.mandatoryMissing.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(220, 38, 38);
+      doc.text("MANDATORY PROOF REQUIRED", 14, currentY);
+
+      const mandatoryData = filteredData.mandatoryMissing.map(e => [
+        e.date, e.merchant, e.category, `${e.currency} ${e.amount.toLocaleString()}`, 'MISSING RECEIPT'
+      ]);
+
+      autoTable(doc, {
+        startY: currentY + 5,
+        head: [['Date', 'Merchant', 'Category', 'Amount', 'Alert']],
+        body: mandatoryData,
+        theme: 'grid',
+        headStyles: { fillColor: [220, 38, 38] }
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    if (filteredData.standardMissing.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(217, 119, 6);
+      doc.text("GENERAL EVIDENCE MISSING", 14, currentY);
+
+      const generalData = filteredData.standardMissing.map(e => [
+        e.date, e.merchant, e.category, `${e.currency} ${e.amount.toLocaleString()}`, 'UNMATCHED'
+      ]);
+
+      autoTable(doc, {
+        startY: currentY + 5,
+        head: [['Date', 'Merchant', 'Category', 'Amount', 'Status']],
+        body: generalData,
+        theme: 'grid',
+        headStyles: { fillColor: [217, 119, 6] }
+      });
+    }
+
     doc.save(`Audit_${period.month}_${period.year}_${auditBank.replace(/\s+/g, '_')}.pdf`);
   };
 
   const downloadAsExcel = () => {
-    const data = filteredData.matched.map(p => ({
+    const workbook = XLSX.utils.book_new();
+
+    // 1. Verified Ledger
+    const verifiedData = filteredData.matched.map(p => ({
       Date: p.bank?.date,
       Merchant: p.bank?.merchant,
       Category: p.bank?.category,
@@ -95,10 +137,35 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       Status: p.label,
       Bank: p.bank?.bank || auditBank
     }));
+    const verifiedSheet = XLSX.utils.json_to_sheet(verifiedData);
+    XLSX.utils.book_append_sheet(workbook, verifiedSheet, "Verified Ledger");
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Verified Ledger");
+    // 2. Mandatory Proof Required
+    const mandatoryData = filteredData.mandatoryMissing.map(e => ({
+      Date: e.date,
+      Merchant: e.merchant,
+      Category: e.category,
+      Amount: e.amount,
+      Currency: e.currency,
+      Status: "MISSING",
+      Bank: e.bank || auditBank
+    }));
+    const mandatorySheet = XLSX.utils.json_to_sheet(mandatoryData);
+    XLSX.utils.book_append_sheet(workbook, mandatorySheet, "Mandatory Proof");
+
+    // 3. General Evidence
+    const generalData = filteredData.standardMissing.map(e => ({
+      Date: e.date,
+      Merchant: e.merchant,
+      Category: e.category,
+      Amount: e.amount,
+      Currency: e.currency,
+      Status: "UNMATCHED",
+      Bank: e.bank || auditBank
+    }));
+    const generalSheet = XLSX.utils.json_to_sheet(generalData);
+    XLSX.utils.book_append_sheet(workbook, generalSheet, "General Evidence");
+
     XLSX.writeFile(workbook, `Audit_${period.month}_${period.year}_${auditBank.replace(/\s+/g, '_')}.xlsx`);
   };
 
@@ -351,7 +418,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                 onChange={(e) => onBankChange?.(e.target.value)}
                 className="appearance-none bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 px-6 pr-12 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
               >
-                {["All Accounts", "Amex", "Citi", "HSBC", "Standard Chartered", "Other"].map(b => (
+                <option value="All Accounts">All Accounts</option>
+                {Array.from(new Set(expenses.filter(e => e.source.includes('bank') || e.source.includes('card')).map(e => e.bank))).filter(Boolean).map(b => (
                   <option key={b} value={b}>{b}</option>
                 ))}
               </select>

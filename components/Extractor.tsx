@@ -47,6 +47,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [previews, setPreviews] = useState<FilePreview[]>([]);
   const [selectedBank, setSelectedBank] = useState<string>('');
+  const [customBankName, setCustomBankName] = useState<string>('');
   const [successCount, setSuccessCount] = useState<{ expenses: number, travel: number } | null>(null);
 
   const formatSize = (bytes: number) => {
@@ -146,7 +147,9 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
       return {
         content: extractionInput,
         source: activeMode === 'receipt' ? 'web_upload' : activeMode,
-        bank: (activeMode === 'bank_statement' || activeMode === 'credit_card_statement') ? selectedBank : ''
+        bank: (activeMode === 'bank_statement' || activeMode === 'credit_card_statement')
+          ? (selectedBank === 'Other' ? customBankName : selectedBank)
+          : ''
       };
     });
 
@@ -170,7 +173,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
           await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        const res = await batchExtractAllData(chunk, selectedBank);
+        const res = await batchExtractAllData(chunk, selectedBank === 'Other' ? customBankName : selectedBank);
         allExpenses.push(...res.expenses);
         allTravelLogs.push(...res.travelLogs);
       }
@@ -252,6 +255,18 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
                 </button>
               ))}
             </div>
+
+            {selectedBank === 'Other' && (
+              <div className="mt-6 w-full max-w-xs animate-in slide-in-from-top-4 duration-300">
+                <input
+                  type="text"
+                  placeholder="Enter Bank/Provider Name..."
+                  value={customBankName}
+                  onChange={(e) => setCustomBankName(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-brand-200 dark:border-brand-900 rounded-2xl py-4 px-6 text-xs font-black uppercase tracking-widest text-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-500/10 transition-all text-center"
+                />
+              </div>
+            )}
           </div>
         </div>
 
