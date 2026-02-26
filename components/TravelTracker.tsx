@@ -1,27 +1,22 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { TravelLog } from '../types';
 import { isHomeLocation } from '../firebaseService';
 import {
   Plane,
   MapPin,
   Calendar,
-  Clock,
   Hotel,
   Globe,
-  ChevronRight,
-  TrendingUp,
   Award,
-  Navigation,
-  History,
-  CheckCircle2,
-  AlertTriangle,
-  Loader2,
-  ArrowRightLeft,
-  Home,
   ShieldCheck,
   ShieldAlert,
-  User
+  History,
+  Info,
+  ChevronRight,
+  TrendingUp,
+  Map,
+  ArrowRightLeft
 } from 'lucide-react';
 
 interface TravelTrackerProps {
@@ -29,7 +24,21 @@ interface TravelTrackerProps {
   period: { month: string; year: number };
 }
 
+type JurisdictionSegment = {
+  id: string;
+  country: string;
+  city: string;
+  days: number;
+  startDate: string;
+  endDate: string;
+  flight: TravelLog | null;
+  hotel: TravelLog | null;
+  status: 'verified' | 'action_required';
+  provider: string;
+};
+
 const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
+  const [filter, setFilter] = useState<'all' | 'verified' | 'action_required'>('all');
   const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   const filteredLogs = useMemo(() => {
@@ -42,224 +51,263 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, period }) => {
     });
   }, [logs, period]);
 
-  const confirmedLogs = useMemo(() => filteredLogs.filter(l => l.status === 'Complete' && l.travel_type === 'flight'), [filteredLogs]);
-  const accommodationLogs = useMemo(() => filteredLogs.filter(l => l.travel_type === 'accommodation'), [filteredLogs]);
+  // CORE LOGIC: Group logs into Jurisdiction Segments (Trips)
+  const segments = useMemo(() => {
+    const flightLogs = filteredLogs.filter(l => l.travel_type === 'flight' && !l.outbound_flight_id);
+    const hotelLogs = filteredLogs.filter(l => l.travel_type === 'accommodation');
 
-  const countryStats = useMemo(() => {
-    const stats: Record<string, number> = {};
-    confirmedLogs.filter(l => !isHomeLocation(l)).forEach(log => {
-      const country = log.destination_country || "International";
-      stats[country] = (stats[country] || 0) + log.days_spent;
+    const result: JurisdictionSegment[] = [];
+    const usedHotelDocIds = new Set<string>();
+
+    // 1. Process Flights as primary anchors
+    flightLogs.forEach(flight => {
+      const linkedHotel = hotelLogs.find(h =>
+        h.document_id === flight.linked_hotel_id ||
+        (new Date(h.start_date) >= new Date(flight.departure_date || flight.start_date) &&
+          new Date(h.start_date) <= new Date(flight.return_date || flight.end_date || flight.start_date))
+      );
+
+      if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
+
+      result.push({
+        id: flight.id,
+        country: flight.destination_country || "Unknown",
+        city: flight.destination_city || "Various",
+        days: flight.days_spent || 1,
+        startDate: flight.departure_date || flight.start_date,
+        endDate: flight.return_date || flight.end_date || flight.start_date,
+        flight: flight,
+        hotel: linkedHotel || null,
+        status: (flight.status === 'Complete' && linkedHotel && flight.hotel_verification_status === 'verified')
+          ? 'verified'
+          : 'action_required',
+        provider: flight.provider_name
+      });
     });
-    return Object.entries(stats).sort((a, b) => b[1] - a[1]);
-  }, [confirmedLogs]);
 
-  const daysAbroad = useMemo(() => {
-    return confirmedLogs.reduce((acc, curr) => {
-      return !isHomeLocation(curr) ? acc + curr.days_spent : acc;
-    }, 0);
-  }, [confirmedLogs]);
+    // 2. Process Standalone Hotels (Stationary Anchors)
+    hotelLogs.filter(h => h.document_id && !usedHotelDocIds.has(h.document_id)).forEach(hotel => {
+      result.push({
+        id: hotel.id,
+        country: hotel.destination_country || "International",
+        city: hotel.destination_city || "Stay",
+        days: hotel.days_spent || 1,
+        startDate: hotel.start_date,
+        endDate: hotel.end_date || hotel.start_date,
+        flight: null,
+        hotel: hotel,
+        status: (hotel.hotel_verification_status === 'verified') ? 'verified' : 'action_required',
+        provider: hotel.provider_name
+      });
+    });
 
-  const totalDaysInPeriod = useMemo(() => {
-    if (period.month === "All Months") return 365;
-    const monthIndex = monthsList.indexOf(period.month);
-    return new Date(period.year, monthIndex + 1, 0).getDate();
-  }, [period, period.year, period.month]);
+    return result.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  }, [filteredLogs]);
 
-  const daysAtHome = Math.max(0, totalDaysInPeriod - daysAbroad);
+  const auditStats = useMemo(() => {
+    const total = segments.length;
+    if (total === 0) return { score: 0, days: 0 };
+    const verified = segments.filter(s => s.status === 'verified').length;
+    const totalDays = segments.reduce((acc, s) => acc + s.days, 0);
+    return {
+      score: Math.round((verified / total) * 100),
+      days: totalDays,
+      count: total
+    };
+  }, [segments]);
 
-  const StatusBadge = ({ status }: { status: string }) => {
-    if (status === 'Complete') {
-      return (
-        <span className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
-          <CheckCircle2 size={12} /> COMPLETE
-        </span>
-      );
-    }
-    if (status === 'Open - Awaiting return') {
-      return (
-        <span className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-amber-500 text-white shadow-lg shadow-amber-500/20">
-          <Loader2 size={12} className="animate-spin" /> RETURN PENDING
-        </span>
-      );
-    }
-    return (
-      <span className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-orange-600 text-white shadow-lg shadow-orange-600/20">
-        <AlertTriangle size={12} /> OUTBOUND MISSING
-      </span>
-    );
-  };
+  const displayedSegments = segments.filter(s => {
+    if (filter === 'all') return true;
+    return s.status === filter;
+  });
 
-  const HotelAuditBadge = ({ status, hotelName }: { status?: string, hotelName?: string }) => {
-    if (status === 'verified') {
-      return (
-        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400">
-          <ShieldCheck size={14} />
-          <span className="text-[10px] font-black uppercase tracking-widest">Hotel Verified: {hotelName || 'Document Linked'}</span>
-        </div>
-      );
-    }
-    if (status === 'missing') {
-      return (
-        <div className="flex items-center gap-2 px-3 py-1 bg-orange-50 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-500/20 rounded-xl text-orange-600 dark:text-orange-400">
-          <ShieldAlert size={14} />
-          <span className="text-[10px] font-black uppercase tracking-widest">Hotel Invoice Missing</span>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  if (filteredLogs.length === 0) {
+  if (segments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-48 text-center animate-in fade-in duration-700">
-        <div className="w-24 h-24 bg-slate-100 dark:bg-slate-900 rounded-[2rem] flex items-center justify-center text-slate-300 dark:text-slate-700 mb-8">
-          <Globe size={48} strokeWidth={1} />
+        <div className="w-24 h-24 bg-slate-100 dark:bg-slate-900 rounded-[3rem] flex items-center justify-center text-slate-300 dark:text-slate-700 mb-8 border border-slate-200 dark:border-slate-800 shadow-xl">
+          <Globe size={44} strokeWidth={1} />
         </div>
-        <h3 className="text-2xl font-black tracking-tighter uppercase">No Global Presence</h3>
-        <p className="text-slate-500 mt-2 max-w-sm font-medium text-sm">Upload flight confirmations or hotel invoices to track your international footprint.</p>
+        <h3 className="text-2xl font-black tracking-tighter uppercase text-slate-800 dark:text-white">No Global Footprint</h3>
+        <p className="text-slate-500 mt-2 max-w-sm font-medium text-sm">Upload flight confirmations or hotel invoices to build your jurisdiction audit trail.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-12 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="bg-brand-600 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-10 opacity-20 group-hover:scale-110 transition-transform duration-700"><Globe size={100} /></div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-80 mb-2">Confirmed Time Abroad</p>
-            <h4 className="text-5xl font-black tracking-tighter">{daysAbroad} <span className="text-lg opacity-60 font-bold uppercase tracking-widest">Days</span></h4>
+      {/* Header Stats Bar */}
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl flex flex-wrap items-center justify-between gap-6 px-10">
+        <div className="flex items-center gap-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+              <Globe size={24} />
+            </div>
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Presence</p>
+              <h4 className="text-2xl font-black tracking-tighter dark:text-white">{auditStats.days} <span className="text-xs opacity-50 uppercase">Days Abroad</span></h4>
+            </div>
           </div>
-          <div className="mt-8 flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-xl"><Award size={16} /></div>
-            <p className="text-[10px] font-black uppercase tracking-widest">{countryStats.length} Jurisdictions Visited</p>
+          <div className="w-px h-10 bg-slate-100 dark:bg-slate-800 hidden md:block"></div>
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Audit Score</p>
+              <h4 className="text-2xl font-black tracking-tighter text-emerald-500">{auditStats.score}% <span className="text-xs opacity-50 uppercase">Verified</span></h4>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#0b1120] p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div className="p-4 bg-brand-50 dark:bg-brand-500/10 rounded-2xl flex items-center justify-center text-brand-600"><Home size={28} /></div>
-            <div className="text-right">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Residency Presence</p>
-              <h4 className="text-3xl font-black tracking-tighter uppercase">UAE</h4>
-            </div>
-          </div>
-          <div className="mt-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-            {daysAtHome} Days at Home Base
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#0b1120] p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div className="p-4 bg-sky-50 dark:bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-500"><Plane size={28} /></div>
-            <div className="text-right">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mobility Logs</p>
-              <h4 className="text-3xl font-black tracking-tighter">{filteredLogs.filter(l => l.travel_type === 'flight').length}</h4>
-            </div>
-          </div>
-          <div className="mt-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-            Total Flight Segments
-          </div>
+        <div className="flex bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-700">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'all' ? 'bg-white dark:bg-slate-700 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            All Stays
+          </button>
+          <button
+            onClick={() => setFilter('verified')}
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'verified' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Verified
+          </button>
+          <button
+            onClick={() => setFilter('action_required')}
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'action_required' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Action Required
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-1 space-y-6">
-          <div className="px-4">
-            <h4 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Jurisdiction Breakdown</h4>
-            <div className="space-y-4">
-              {countryStats.length > 0 ? countryStats.map(([country, days]) => (
-                <div key={country} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 font-black text-[10px]">
-                      {country.substring(0, 2).toUpperCase()}
-                    </div>
-                    <span className="text-xs font-black uppercase tracking-tight dark:text-white">{country}</span>
+      {/* Jurisdiction Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+        {displayedSegments.map(segment => (
+          <div key={segment.id} className="group bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden hover:shadow-2xl hover:border-brand-200 dark:hover:border-brand-500/30 transition-all duration-500">
+            {/* Card Header */}
+            <div className="p-10 pb-6 relative">
+              <div className="flex justify-between items-start mb-8">
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 rounded-[1.5rem] bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-100 dark:border-orange-500/20 shadow-sm group-hover:scale-110 transition-transform duration-500">
+                    <MapPin size={28} />
                   </div>
-                  <div className="text-right">
-                    <span className="text-lg font-black dark:text-white">{days}</span>
-                    <span className="text-[8px] font-black text-slate-400 uppercase block tracking-widest">Days</span>
+                  <div>
+                    <h3 className="text-3xl font-black tracking-tighter dark:text-white uppercase">{segment.country}</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{segment.city}</p>
                   </div>
                 </div>
-              )) : (
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic text-center py-4">All time spent at Home Base.</p>
+                <div className="text-right">
+                  <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{segment.days}</div>
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Captured Days</div>
+                </div>
+              </div>
+
+              {/* Timeline Info */}
+              <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/40 rounded-[2rem] mb-8">
+                <div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Arrive</p>
+                  <p className="text-xs font-black dark:text-white">{segment.startDate}</p>
+                </div>
+                <div className="flex-1 px-4 flex items-center justify-center opacity-20">
+                  <div className="w-full h-px bg-slate-400 border-t border-dashed"></div>
+                  <ChevronRight size={14} className="-ml-1" />
+                </div>
+                <div className="text-right">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Depart</p>
+                  <p className="text-xs font-black dark:text-white">{segment.endDate}</p>
+                </div>
+              </div>
+
+              {/* Proof Components */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${segment.flight ? 'bg-sky-50 text-sky-500' : 'bg-slate-50 text-slate-300'} dark:bg-slate-800`}>
+                      <Plane size={16} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Movement Proof</p>
+                      <p className="text-[10px] font-bold dark:text-slate-300">{segment.flight ? segment.flight.provider_name : "No travel doc found"}</p>
+                    </div>
+                  </div>
+                  {segment.flight && <ShieldCheck size={16} className="text-emerald-500" />}
+                  {!segment.flight && <Info size={16} className="text-slate-300" />}
+                </div>
+
+                <div className="flex items-center justify-between px-2">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${segment.hotel ? 'bg-amber-50 text-amber-500' : 'bg-slate-50 text-slate-300'} dark:bg-slate-800`}>
+                      <Hotel size={16} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Stay Proof</p>
+                      <p className="text-[10px] font-bold dark:text-slate-300">{segment.hotel ? segment.hotel.provider_name : "Missing stay invoice"}</p>
+                    </div>
+                  </div>
+                  {segment.status === 'verified' && <ShieldCheck size={16} className="text-emerald-500" />}
+                  {segment.status !== 'verified' && <ShieldAlert size={16} className="text-orange-500" />}
+                </div>
+              </div>
+            </div>
+
+            {/* Status Footer */}
+            <div className={`px-10 py-5 transition-all duration-500 flex items-center justify-between ${segment.status === 'verified'
+                ? 'bg-emerald-500 text-white shadow-[0_-10px_20px_-5px_rgba(16,185,129,0.2)]'
+                : 'bg-slate-50 dark:bg-slate-800/80 text-slate-400 border-t border-slate-100 dark:border-slate-800'
+              }`}>
+              <div className="flex items-center gap-3">
+                {segment.status === 'verified' ? <ShieldCheck size={18} /> : <ShieldAlert size={18} className="text-orange-500" />}
+                <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+                  {segment.status === 'verified' ? "Audit Verified" : "Action Required"}
+                </span>
+              </div>
+              {segment.status === 'verified' && (
+                <span className="text-[9px] font-black opacity-80 uppercase tracking-widest">Matched to Bank</span>
               )}
             </div>
           </div>
+        ))}
+      </div>
+
+      {/* Auditor's Guide Footer */}
+      <div className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-slate-100 dark:border-slate-800 p-12 shadow-xl">
+        <div className="flex items-center gap-5 mb-10">
+          <div className="w-14 h-14 rounded-2xl bg-brand-50 dark:bg-brand-500/10 flex items-center justify-center text-brand-600">
+            <History size={24} />
+          </div>
+          <div>
+            <h4 className="text-xl font-black tracking-tighter dark:text-white uppercase">Auditor's Guide</h4>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">How we verify your presence</p>
+          </div>
         </div>
 
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden">
-            <div className="px-12 py-8 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <History size={20} className="text-brand-500" />
-                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Travel Mobility Trail</h4>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-brand-600">
+              <Plane size={20} />
+              <h5 className="text-[11px] font-black uppercase tracking-[0.2em]">1. Movement</h5>
             </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {filteredLogs
-                .filter(l => l.travel_type === 'flight' && !l.outbound_flight_id && !isHomeLocation(l))
-                .map(log => {
-                  const isMerged = !!(log.return_flight_id || log.return_date);
-                  const hotelStay = accommodationLogs.find(h => h.document_id === log.linked_hotel_id);
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+              Flights establish your **Jurisdiction Entry & Exit**. They are the primary anchors for your travel dates.
+            </p>
+          </div>
 
-                  return (
-                    <div key={log.id} className="p-10 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all flex items-center justify-between group">
-                      <div className="flex items-center gap-8">
-                        <div className={`p-5 rounded-[2rem] bg-sky-50 text-sky-600 dark:bg-slate-800/50 shadow-sm border border-white dark:border-slate-700`}>
-                          <Plane size={32} />
-                        </div>
-                        <div>
-                          <div className="flex flex-wrap items-center gap-3 mb-2">
-                            <h5 className="text-xl font-black tracking-tighter uppercase dark:text-white">
-                              {isHomeLocation(log) ? "Dubai (Return Home)" : `${log.destination_city || log.destination_country}`}
-                            </h5>
-                            <StatusBadge status={log.status} />
-                            {isMerged && !isHomeLocation(log) && (
-                              <span className="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-widest border border-indigo-200">
-                                <ArrowRightLeft size={8} className="inline mr-1" /> Bridged Segment
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">
-                            <span className="flex items-center gap-2">
-                              <Calendar size={14} className="opacity-50" />
-                              <span>{log.departure_date || log.start_date}</span>
-                              {log.return_date && (
-                                <>
-                                  <span className="opacity-30">→</span>
-                                  <span>{log.return_date}</span>
-                                </>
-                              )}
-                            </span>
-                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                            <span className="flex items-center gap-2"><MapPin size={14} className="opacity-50" /> {log.provider_name}</span>
-                          </div>
-
-                          <div className="flex flex-col gap-2">
-                            <HotelAuditBadge status={log.hotel_verification_status} hotelName={hotelStay?.provider_name} />
-                            {hotelStay && (
-                              <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
-                                <User size={12} /> Registered Guest: {hotelStay.guest_name || 'Not Extracted'}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-black dark:text-white tracking-tighter">
-                          {log.days_spent}
-                        </div>
-                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                          {log.days_spent === 1 ? 'Captured Day' : 'Captured Days'}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-emerald-500">
+              <Hotel size={20} />
+              <h5 className="text-[11px] font-black uppercase tracking-[0.2em]">2. Presence</h5>
             </div>
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+              Hotel invoices provide **Stationary Proof**. They verify you were physically present in the country during those dates.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-sky-500">
+              <ShieldCheck size={20} />
+              <h5 className="text-[11px] font-black uppercase tracking-[0.2em]">3. Verification</h5>
+            </div>
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+              A stay is **Audit Verified** only when the hotel invoice is matched to a corresponding payment on your **Bank Statement**.
+            </p>
           </div>
         </div>
       </div>
