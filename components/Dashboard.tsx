@@ -76,7 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         // Window Parity
         const diffDays = Math.abs(bDate - rDate) / (1000 * 60 * 60 * 24);
-        if (diffDays > 3) return false;
+        if (diffDays > 14) return false;
 
         // Merchant Parity
         const bMerc = bankTx.merchant.toLowerCase();

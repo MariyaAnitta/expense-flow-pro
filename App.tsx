@@ -161,7 +161,18 @@ const App: React.FC = () => {
         const eYear = parseInt(parts[0]);
         const eMonthIndex = parseInt(parts[1]) - 1;
 
-        const periodMatch = eYear === selectedYear && (selectedMonth === "All Months" || monthsList[eMonthIndex] === selectedMonth);
+        // EXPANDED ANCHOR LOGIC: Include current month AND the following month
+        // logic: if auditing Jan, we need Feb bank records to catch hotel settlements.
+        const isCurrentPeriod = eYear === selectedYear && (selectedMonth === "All Months" || monthsList[eMonthIndex] === selectedMonth);
+
+        // Check if it's the following month
+        const targetMonthIndex = monthsList.indexOf(selectedMonth);
+        const isNextMonth = selectedMonth !== "All Months" && (
+          (eYear === selectedYear && eMonthIndex === targetMonthIndex + 1) ||
+          (eYear === selectedYear + 1 && targetMonthIndex === 11 && eMonthIndex === 0)
+        );
+
+        const periodMatch = isCurrentPeriod || isNextMonth;
         const bankMatch = auditBank === "All Accounts" || e.bank === auditBank;
 
         return periodMatch && bankMatch;
