@@ -137,7 +137,15 @@ const ExpenseRecordSchema = z.object({
     a: z.number().describe("Amount"),
     c: z.string().describe("Currency"),
     d: z.string().describe("Date YYYY-MM-DD"),
-    cat: z.string().describe("Category")
+    cat: z.enum(['Transport', 'Meals', 'Lodging', 'Office', 'Utilities', 'Salary', 'Transfer', 'General']).describe("Category"),
+    items: z.array(z.string()).optional().describe("Line items if visible (e.g. Room Charge, Coffee, etc.)"),
+    tax_amount: z.number().optional().describe("Tax or VAT amount if visible"),
+    main_category: z.string().optional().describe("Broad classification (Business vs Personal)"),
+    company_project: z.string().optional().describe("Client or project name"),
+    reimbursement_status: z.string().optional().describe("Status for company payout"),
+    paid_by: z.string().optional().describe("Who paid (Employee vs Company)"),
+    payment_method: z.string().optional().describe("Payment type (Card, Cash)"),
+    notes: z.string().optional().describe("Any additional context")
 });
 
 const ExtractionOutputSchema = z.object({
@@ -154,6 +162,7 @@ async function runExpenseAgent(content: string, source: string) {
     1. For SINGLE RECEIPTS/INVOICES/HOTEL FOLIOS: Extract exactly ONE consolidated expense record for the entire document.
        - FOR HOTEL BILLS: Extract the FINAL TOTAL CHARGE only. NEVER extract individual daily room rates, taxes, or service charges as separate rows.
        - UNIFIED AMOUNT: The 'amount' must be the total value of the invoice (e.g., 1590.00).
+       - CATEGORY BIAS: If you see "ROOM CHARGE", "NIGHTS", "FOLIO", or "STAY", you MUST use the category "Lodging". NEVER use "Meals" or "Food" for a hotel invoice even if it contains taxes/fees.
     2. For BANK/CREDIT CARD STATEMENTS: Identify as a statement and extract each transaction row.
     3. For TRAVEL DOCUMENTS: Populate 'travel_logs'.
     
@@ -164,6 +173,8 @@ async function runExpenseAgent(content: string, source: string) {
     - DATE INTERPRETATION: Interpret source dates as DD/MM/YYYY. (e.g., 01/12 is December 1st). 
     - DATE OUTPUT: ALWAYS return YYYY-MM-DD.
     - If the document mentions travel (flight, hotel, visa), 'travel_logs' MUST NOT BE EMPTY.
+    
+    CATEGORIES: Transport, Meals, Lodging, Office, Utilities, Salary, Transfer, General.
     
     TRAVEL LOG SPECIFICS:
     - provider: Airline or Hotel Name.
@@ -216,6 +227,7 @@ async function runBatchExpenseAgent(inputs: { content: string, source: string }[
       - Use the absolute FINAL TOTAL (Total Payable) as the 'amount'.
       - DO NOT manually sum line items; use the printed "Total" directly.
       - DO NOT use "Balance" if it is 0.00.
+      - CATEGORY BIAS: If you see "ROOM CHARGE", "NIGHTS", "FOLIO", or "STAY", you MUST use the category "Lodging". NEVER use "Meals" or "Food" for a hotel invoice even if it contains taxes/fees.
     - DO NOT SKIP ANY DOCUMENTS.
     - Extract ALL expenses from receipts and statements.
     - RETURN EVERY LINE ITEM FOR BANK STATEMENTS ONLY.

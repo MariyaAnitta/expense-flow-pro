@@ -63,7 +63,15 @@ export const batchExtractAllData = async (
         bank: bankName,
         source,
         confidence: 1.0,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        items: item.items,
+        tax_amount: item.tax_amount,
+        main_category: item.main_category,
+        company_project: item.company_project,
+        reimbursement_status: item.reimbursement_status,
+        paid_by: item.paid_by,
+        payment_method: item.payment_method,
+        notes: item.notes
       }));
 
       const docId = `doc-${Date.now()}-${batchIdx}`;
