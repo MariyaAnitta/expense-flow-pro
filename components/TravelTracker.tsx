@@ -146,7 +146,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
 
   // CORE LOGIC: Group logs into Jurisdiction Segments (Trips)
   const segments = useMemo(() => {
-    // Cross-Month Filter: Include logs that either START or END in this period
+    // 1. FILTER: Documents for this period (Monthly Focus)
     const monthLogs = logs.filter(log => {
       const sDate = new Date(log.start_date);
       const eDate = new Date(log.end_date || log.start_date);
@@ -164,29 +164,16 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       return isProof && (cat === 'lodging' || cat === 'accommodation' || mainCat === 'lodging' || mainCat === 'accommodation');
     });
 
-    // Detect Standalone Flights (No TravelLog found, but receipt exists)
-    const flightExpenses = expenses.filter(e => {
-      const cat = (e.category || "").toLowerCase();
-      const isProof = e.source !== 'bank_statement' && e.source !== 'credit_card_statement';
-      const eMerc = e.merchant.toLowerCase();
-      const isFlight = cat === 'transport' || cat === 'travel' || eMerc.includes('flydubai') || eMerc.includes('emirates');
-      if (!isProof || !isFlight) return false;
-
-      // Ensure no TravelLog already covers this date (within 1 day)
-      const hasLog = logs.some(l => Math.abs(new Date(l.start_date).getTime() - new Date(e.date).getTime()) < 86400000);
-      return !hasLog;
-    });
-
     const result: JurisdictionSegment[] = [];
-    const usedIds = new Set<string>(); // EXCLUSIVITY REGISTER
+    const usedIds = new Set<string>(); // EXCLUSIVITY REGISTER (1:1 Locks)
 
-    // 1. Process Logs (Trips anchored by PDF tickets)
+    // 2. PROCESS FLIGHTS (Primary Anchors)
     flightLogs.forEach(flight => {
       const tripStart = new Date(flight.departure_date || flight.start_date);
       const tripEnd = new Date(flight.return_date || flight.end_date || flight.start_date);
       const flightDest = (flight.destination_country || "").toLowerCase();
 
-      // DUAL-SOURCE STAY PROOF + GEOGRAPHY GUARD
+      // DUAL-SOURCE STAY PROOF + GEOGRAPHY GUARD (Ensures hotels link to the right country)
       let linkedHotel = hotelLogs.find(h => {
         const hDate = new Date(h.start_date);
         const hDest = (h.destination_country || "").toLowerCase();
@@ -201,7 +188,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         return dateMatch && !usedIds.has(e.id);
       }) : null;
 
-      // 2. HIGH-PRECISION MATCHING: Pass usedIds for 1:1 exclusivity
+      // 1:1 FORENSIC MATCHING (Locks the receipt/transaction so it's not reused)
       const fMatch = getFinancialMatch(flight, 'flight', null, usedIds);
       const hMatch = getFinancialMatch(
         linkedHotel || (linkedHotelExpense ? { start_date: linkedHotelExpense.date, provider_name: linkedHotelExpense.merchant, travel_type: 'accommodation' } as any : null),
@@ -230,31 +217,13 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       });
     });
 
-    // 2. Process Standalone Flight Expenses (E.g. Flydubai receipts without PDFs)
-    flightExpenses.forEach(exp => {
-      const fakeLog = { start_date: exp.date, provider_name: exp.merchant, travel_type: 'flight' } as any;
-      const fMatch = getFinancialMatch(fakeLog, 'flight', exp, usedIds);
-
-      result.push({
-        id: `standalone-f-${exp.id}`,
-        country: "Flight Proof",
-        city: "Various",
-        days: 1,
-        startDate: exp.date,
-        endDate: exp.date,
-        flight: fakeLog,
-        hotel: null,
-        status: fMatch ? 'verified' : 'action_required',
-        provider: exp.merchant,
-        financials: {
-          flightAmt: fMatch?.amount,
-          flightCurr: fMatch?.currency
-        }
-      });
-    });
-
-    // 3. Process Standalone Hotels (Stationary Anchors)
-    hotelLogs.filter(h => h.document_id && !Array.from(usedIds).some(id => id.includes(h.document_id || ""))).forEach(hotel => {
+    // 3. PROCESS STANDALONE HOTELS (Anchors without flights)
+    hotelLogs.filter(h => {
+      const sDate = new Date(h.start_date);
+      const inPeriod = sDate.getFullYear() === period.year && (period.month === "All Months" || monthsList[sDate.getMonth()] === period.month);
+      const alreadyLinked = Array.from(usedIds).some(id => id.includes(h.document_id || "NOT-FOUND"));
+      return inPeriod && !alreadyLinked;
+    }).forEach(hotel => {
       const hMatch = getFinancialMatch(hotel, 'accommodation', null, usedIds);
       result.push({
         id: hotel.id,
@@ -275,7 +244,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     });
 
     return result.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-  }, [filteredLogs, expenses, exchangeData]);
+  }, [logs, expenses, exchangeData, period]);
 
   const auditStats = useMemo(() => {
     const total = segments.length;
