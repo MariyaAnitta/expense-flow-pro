@@ -71,13 +71,19 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
   }, [logs, period]);
 
   // FORENSIC MATCHING ENGINE: Robust check for financial anchors + Scoped Proof Matching
-  const getFinancialMatch = (log: TravelLog | null, type: 'flight' | 'accommodation', specificProof?: Expense | null) => {
+  const getFinancialMatch = (
+    log: TravelLog | null,
+    type: 'flight' | 'accommodation',
+    specificProof?: Expense | null,
+    usedIds?: Set<string>
+  ) => {
     if (!log || !exchangeData) return null;
 
     const rates = exchangeData.rates || {};
     const anchors = expenses.filter(e => {
       const src = String(e.source || '').toLowerCase().trim();
-      return src === 'bank_statement' || src === 'credit_card_statement';
+      const isAnchor = src === 'bank_statement' || src === 'credit_card_statement';
+      return isAnchor && (!usedIds || !usedIds.has(e.id));
     });
 
     const lDate = new Date(log.start_date || log.departure_date || "").getTime();
@@ -101,87 +107,107 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     if (candidates.length === 0) return null;
 
     // 2. SCOPED PROOF RANKING
-    // Only use proof amounts that are logically part of this trip's timeline
     let bestProof = specificProof;
-    if (!bestProof && !isHotel) {
-      // For flights, if no specific proof is passed, look for proof docs (receipts) only within 3 days of departure
-      const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
+    if (!bestProof) {
+      const proofs = expenses.filter(e => {
+        const src = String(e.source || '').toLowerCase().trim();
+        const isProof = src !== 'bank_statement' && src !== 'credit_card_statement';
+        return isProof && (!usedIds || !usedIds.has(e.id));
+      });
+
       bestProof = proofs.find(p => {
         const pDate = new Date(p.date).getTime();
         const pMerc = p.merchant.toLowerCase();
-        return Math.abs(pDate - lDate) < (3 * 86400000) && (pMerc.includes(lProv) || lProv.includes(pMerc.substring(0, 4)));
+        const windowMatch = type === 'flight' ? Math.abs(pDate - lDate) < (3 * 86400000) : Math.abs(pDate - lDate) < (7 * 86400000);
+        return windowMatch && (pMerc.includes(lProv) || lProv.includes(pMerc.substring(0, 4)));
       });
     }
 
     if (bestProof) {
       const pINR = convertToINR(bestProof.amount, bestProof.currency, rates);
-      return [...candidates].sort((a, b) => {
+      const winner = [...candidates].sort((a, b) => {
         const aINR = convertToINR(a.amount, a.currency, rates);
         const bINR = convertToINR(b.amount, b.currency, rates);
-        const aDiff = Math.abs(aINR - pINR);
-        const bDiff = Math.abs(bINR - pINR);
-        return aDiff - bDiff; // Sort by amount precision
+        return Math.abs(aINR - pINR) - Math.abs(bINR - pINR);
       })[0];
+      if (winner && usedIds) usedIds.add(winner.id);
+      if (bestProof && usedIds) usedIds.add(bestProof.id);
+      return winner;
     }
 
-    // Default to closest date
-    return [...candidates].sort((a, b) => {
+    const winner = [...candidates].sort((a, b) => {
       const aDiff = Math.abs(new Date(a.date).getTime() - lDate);
       const bDiff = Math.abs(new Date(b.date).getTime() - lDate);
       return aDiff - bDiff;
     })[0];
+    if (winner && usedIds) usedIds.add(winner.id);
+    return winner;
   };
 
   // CORE LOGIC: Group logs into Jurisdiction Segments (Trips)
   const segments = useMemo(() => {
-    const flightLogs = filteredLogs.filter(l => l.travel_type === 'flight' && !l.outbound_flight_id);
-    const hotelLogs = filteredLogs.filter(l => l.travel_type === 'accommodation');
+    // Cross-Month Filter: Include logs that either START or END in this period
+    const monthLogs = logs.filter(log => {
+      const sDate = new Date(log.start_date);
+      const eDate = new Date(log.end_date || log.start_date);
+      const sMatch = sDate.getFullYear() === period.year && (period.month === "All Months" || monthsList[sDate.getMonth()] === period.month);
+      const eMatch = eDate.getFullYear() === period.year && (period.month === "All Months" || monthsList[eDate.getMonth()] === period.month);
+      return sMatch || eMatch;
+    });
+
+    const flightLogs = monthLogs.filter(l => l.travel_type === 'flight' && !l.outbound_flight_id);
+    const hotelLogs = logs.filter(l => l.travel_type === 'accommodation');
     const lodgingExpenses = expenses.filter(e => {
       const cat = (e.category || "").toLowerCase();
       const mainCat = (e.main_category || "").toLowerCase();
-      return cat === 'lodging' || cat === 'accommodation' || mainCat === 'lodging' || mainCat === 'accommodation';
+      const isProof = e.source !== 'bank_statement' && e.source !== 'credit_card_statement';
+      return isProof && (cat === 'lodging' || cat === 'accommodation' || mainCat === 'lodging' || mainCat === 'accommodation');
+    });
+
+    // Detect Standalone Flights (No TravelLog found, but receipt exists)
+    const flightExpenses = expenses.filter(e => {
+      const cat = (e.category || "").toLowerCase();
+      const isProof = e.source !== 'bank_statement' && e.source !== 'credit_card_statement';
+      const eMerc = e.merchant.toLowerCase();
+      const isFlight = cat === 'transport' || cat === 'travel' || eMerc.includes('flydubai') || eMerc.includes('emirates');
+      if (!isProof || !isFlight) return false;
+
+      // Ensure no TravelLog already covers this date (within 1 day)
+      const hasLog = logs.some(l => Math.abs(new Date(l.start_date).getTime() - new Date(e.date).getTime()) < 86400000);
+      return !hasLog;
     });
 
     const result: JurisdictionSegment[] = [];
-    const usedHotelDocIds = new Set<string>();
-    const usedHotelExpenseIds = new Set<string>();
+    const usedIds = new Set<string>(); // EXCLUSIVITY REGISTER
 
+    // 1. Process Logs (Trips anchored by PDF tickets)
     flightLogs.forEach(flight => {
       const tripStart = new Date(flight.departure_date || flight.start_date);
       const tripEnd = new Date(flight.return_date || flight.end_date || flight.start_date);
       const flightDest = (flight.destination_country || "").toLowerCase();
 
-      // 1. DUAL-SOURCE STAY PROOF: Link via logs or raw expenses + GEOGRAPHY GUARD
+      // DUAL-SOURCE STAY PROOF + GEOGRAPHY GUARD
       let linkedHotel = hotelLogs.find(h => {
         const hDate = new Date(h.start_date);
         const hDest = (h.destination_country || "").toLowerCase();
-
+        const sameCountry = hDest && (flightDest.includes(hDest) || hDest.includes(flightDest));
         const dateMatch = (hDate >= tripStart && hDate <= new Date(tripEnd.getTime() + 86400000));
-        // Guard: Hotel must either be linked by doc_id OR geography must bridge to the trip destination
-        const geoMatch = hDest && (flightDest.includes(hDest) || hDest.includes(flightDest));
-        const idMatch = h.document_id === flight.linked_hotel_id;
-
-        return idMatch || (dateMatch && geoMatch);
+        return (h.document_id === flight.linked_hotel_id) || (dateMatch && sameCountry);
       });
 
       let linkedHotelExpense = !linkedHotel ? lodgingExpenses.find(e => {
         const hDate = new Date(e.date);
-        const eMerc = e.merchant.toLowerCase();
-
         const dateMatch = (hDate >= tripStart && hDate <= new Date(tripEnd.getTime() + 86400000));
-        // Expense Guard: Raw expenses often lack "Country" metadata, so we rely on Date Link
-        return dateMatch;
+        return dateMatch && !usedIds.has(e.id);
       }) : null;
 
-      if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
-      if (linkedHotelExpense?.id) usedHotelExpenseIds.add(linkedHotelExpense.id);
-
-      // 2. HIGH-PRECISION MATCHING: Pass the exact proof doc found for this trip
-      const fMatch = getFinancialMatch(flight, 'flight');
+      // 2. HIGH-PRECISION MATCHING: Pass usedIds for 1:1 exclusivity
+      const fMatch = getFinancialMatch(flight, 'flight', null, usedIds);
       const hMatch = getFinancialMatch(
         linkedHotel || (linkedHotelExpense ? { start_date: linkedHotelExpense.date, provider_name: linkedHotelExpense.merchant, travel_type: 'accommodation' } as any : null),
         'accommodation',
-        linkedHotelExpense // Pass the raw expense proof if it was the source
+        linkedHotelExpense,
+        usedIds
       );
 
       result.push({
@@ -204,9 +230,32 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       });
     });
 
-    // 2. Process Standalone Hotels (Stationary Anchors)
-    hotelLogs.filter(h => h.document_id && !usedHotelDocIds.has(h.document_id)).forEach(hotel => {
-      const hMatch = getFinancialMatch(hotel, 'accommodation');
+    // 2. Process Standalone Flight Expenses (E.g. Flydubai receipts without PDFs)
+    flightExpenses.forEach(exp => {
+      const fakeLog = { start_date: exp.date, provider_name: exp.merchant, travel_type: 'flight' } as any;
+      const fMatch = getFinancialMatch(fakeLog, 'flight', exp, usedIds);
+
+      result.push({
+        id: `standalone-f-${exp.id}`,
+        country: "Flight Proof",
+        city: "Various",
+        days: 1,
+        startDate: exp.date,
+        endDate: exp.date,
+        flight: fakeLog,
+        hotel: null,
+        status: fMatch ? 'verified' : 'action_required',
+        provider: exp.merchant,
+        financials: {
+          flightAmt: fMatch?.amount,
+          flightCurr: fMatch?.currency
+        }
+      });
+    });
+
+    // 3. Process Standalone Hotels (Stationary Anchors)
+    hotelLogs.filter(h => h.document_id && !Array.from(usedIds).some(id => id.includes(h.document_id || ""))).forEach(hotel => {
+      const hMatch = getFinancialMatch(hotel, 'accommodation', null, usedIds);
       result.push({
         id: hotel.id,
         country: hotel.destination_country || "International",
