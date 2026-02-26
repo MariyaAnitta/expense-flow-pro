@@ -70,7 +70,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     });
   }, [logs, period]);
 
-  // FORENSIC MATCHING ENGINE: Robust check for financial anchors
+  // FORENSIC MATCHING ENGINE: Robust check for financial anchors + Best Match Ranking
   const getFinancialMatch = (log: TravelLog | null, type: 'flight' | 'accommodation') => {
     if (!log || !exchangeData) return null;
 
@@ -80,37 +80,48 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       return src === 'bank_statement' || src === 'credit_card_statement';
     });
 
-    return anchors.find(bankTx => {
+    const lDate = new Date(log.start_date || log.departure_date || "").getTime();
+    if (!lDate) return null;
+
+    const isHotel = type === 'accommodation';
+    const lProv = (log.provider_name || "").toLowerCase().substring(0, 4);
+
+    // 1. Find all merchant candidates
+    const candidates = anchors.filter(bankTx => {
       const bDate = new Date(bankTx.date).getTime();
-      const lDate = new Date(log.start_date || log.departure_date || "").getTime();
-      if (!lDate) return false;
-
-      // Window: 14 days for hotels, 30 days for flights (often booked in advance)
       const diffDays = Math.abs(bDate - lDate) / (1000 * 60 * 60 * 24);
-      const isHotel = type === 'accommodation';
-      if (isHotel && diffDays > 14) return false;
-      if (!isHotel && diffDays > 30) return false;
-
       const bMerc = bankTx.merchant.toLowerCase();
-      const lProv = (log.provider_name || "").toLowerCase();
-      const mercMatch = lProv.includes(bMerc.substring(0, 4)) || bMerc.includes(lProv.substring(0, 4));
-      if (!mercMatch) return false;
 
-      // Currency-aware amount check
-      // For flights, if the merchant matches within 30 days, we accept it as the financial proof
-      if (!isHotel) return true;
+      const windowMatch = isHotel ? diffDays <= 14 : diffDays <= 30;
+      const mercMatch = bMerc.includes(lProv) || lProv.includes(bMerc.substring(0, 4));
 
-      const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
-      const docMatch = proofs.find(p => p.merchant.toLowerCase().includes(lProv.substring(0, 4)) || lProv.includes(p.merchant.toLowerCase().substring(0, 4)));
-
-      if (docMatch) {
-        const bINR = convertToINR(bankTx.amount, bankTx.currency, rates);
-        const pINR = convertToINR(docMatch.amount, docMatch.currency, rates);
-        const sameCurrency = bankTx.currency === docMatch.currency;
-        return sameCurrency ? Math.abs(bankTx.amount - docMatch.amount) < 0.10 : Math.abs(bINR - pINR) < (bINR * 0.05);
-      }
-      return true; // Use merchant + date if no specific doc found
+      return windowMatch && mercMatch;
     });
+
+    if (candidates.length === 0) return null;
+
+    // 2. BEST MATCH SELECTION
+    // If we have a proof document (hotel invoice), prioritize the CLOSEST AMOUNT
+    const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
+    const docMatch = proofs.find(p => p.merchant.toLowerCase().includes(lProv) || lProv.includes(p.merchant.toLowerCase().substring(0, 4)));
+
+    if (docMatch) {
+      const pINR = convertToINR(docMatch.amount, docMatch.currency, rates);
+      return [...candidates].sort((a, b) => {
+        const aINR = convertToINR(a.amount, a.currency, rates);
+        const bINR = convertToINR(b.amount, b.currency, rates);
+        const aDiff = Math.abs(aINR - pINR);
+        const bDiff = Math.abs(bINR - pINR);
+        return aDiff - bDiff; // Sort by closest amount
+      })[0];
+    }
+
+    // Otherwise, pick the CLOSEST DATE
+    return [...candidates].sort((a, b) => {
+      const aDiff = Math.abs(new Date(a.date).getTime() - lDate);
+      const bDiff = Math.abs(new Date(b.date).getTime() - lDate);
+      return aDiff - bDiff;
+    })[0];
   };
 
   // CORE LOGIC: Group logs into Jurisdiction Segments (Trips)
@@ -130,16 +141,28 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     flightLogs.forEach(flight => {
       const tripStart = new Date(flight.departure_date || flight.start_date);
       const tripEnd = new Date(flight.return_date || flight.end_date || flight.start_date);
+      const flightDest = (flight.destination_country || "").toLowerCase();
 
-      // 1. DUAL-SOURCE STAY PROOF: Link via logs or raw expenses
-      let linkedHotel = hotelLogs.find(h =>
-        h.document_id === flight.linked_hotel_id ||
-        (new Date(h.start_date) >= tripStart && new Date(h.start_date) <= new Date(tripEnd.getTime() + 86400000))
-      );
+      // 1. DUAL-SOURCE STAY PROOF: Link via logs or raw expenses + GEOGRAPHY GUARD
+      let linkedHotel = hotelLogs.find(h => {
+        const hDate = new Date(h.start_date);
+        const hDest = (h.destination_country || "").toLowerCase();
+
+        const dateMatch = (hDate >= tripStart && hDate <= new Date(tripEnd.getTime() + 86400000));
+        // Guard: Hotel must either be linked by doc_id OR geography must bridge to the trip destination
+        const geoMatch = hDest && (flightDest.includes(hDest) || hDest.includes(flightDest));
+        const idMatch = h.document_id === flight.linked_hotel_id;
+
+        return idMatch || (dateMatch && geoMatch);
+      });
 
       let linkedHotelExpense = !linkedHotel ? lodgingExpenses.find(e => {
         const hDate = new Date(e.date);
-        return hDate >= tripStart && hDate <= new Date(tripEnd.getTime() + 86400000);
+        const eMerc = e.merchant.toLowerCase();
+
+        const dateMatch = (hDate >= tripStart && hDate <= new Date(tripEnd.getTime() + 86400000));
+        // Expense Guard: Raw expenses often lack "Country" metadata, so we rely on Date Link
+        return dateMatch;
       }) : null;
 
       if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
