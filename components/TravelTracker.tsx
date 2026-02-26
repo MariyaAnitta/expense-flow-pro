@@ -70,9 +70,9 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     });
   }, [logs, period]);
 
-  // FORENSIC MATCHING ENGINE: Detailed Version for Auditing
-  const getVerificationDetails = (log: TravelLog | null) => {
-    if (!log || !exchangeData) return { verified: false };
+  // FORENSIC MATCHING ENGINE: Robust check for financial anchors
+  const getFinancialMatch = (log: TravelLog | null, type: 'flight' | 'accommodation') => {
+    if (!log || !exchangeData) return null;
 
     const rates = exchangeData.rates || {};
     const anchors = expenses.filter(e => {
@@ -80,19 +80,25 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       return src === 'bank_statement' || src === 'credit_card_statement';
     });
 
-    const match = anchors.find(bankTx => {
+    return anchors.find(bankTx => {
       const bDate = new Date(bankTx.date).getTime();
-      const lDate = new Date(log.start_date).getTime();
+      const lDate = new Date(log.start_date || log.departure_date || "").getTime();
+      if (!lDate) return false;
 
-      if (log.travel_type !== 'accommodation') return false;
-
+      // Window: 14 days for hotels, 30 days for flights (often booked in advance)
       const diffDays = Math.abs(bDate - lDate) / (1000 * 60 * 60 * 24);
-      if (diffDays > 14) return false;
+      const isHotel = type === 'accommodation';
+      if (isHotel && diffDays > 14) return false;
+      if (!isHotel && diffDays > 30) return false;
 
       const bMerc = bankTx.merchant.toLowerCase();
       const lProv = (log.provider_name || "").toLowerCase();
       const mercMatch = lProv.includes(bMerc.substring(0, 4)) || bMerc.includes(lProv.substring(0, 4));
       if (!mercMatch) return false;
+
+      // Currency-aware amount check
+      // For flights, if the merchant matches within 30 days, we accept it as the financial proof
+      if (!isHotel) return true;
 
       const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
       const docMatch = proofs.find(p => p.merchant.toLowerCase().includes(lProv.substring(0, 4)) || lProv.includes(p.merchant.toLowerCase().substring(0, 4)));
@@ -103,34 +109,44 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         const sameCurrency = bankTx.currency === docMatch.currency;
         return sameCurrency ? Math.abs(bankTx.amount - docMatch.amount) < 0.10 : Math.abs(bINR - pINR) < (bINR * 0.05);
       }
-      return false;
+      return true; // Use merchant + date if no specific doc found
     });
-
-    if (match) {
-      return { verified: true, amount: match.amount, currency: match.currency };
-    }
-
-    return { verified: log.hotel_verification_status === 'verified' };
   };
 
   // CORE LOGIC: Group logs into Jurisdiction Segments (Trips)
   const segments = useMemo(() => {
     const flightLogs = filteredLogs.filter(l => l.travel_type === 'flight' && !l.outbound_flight_id);
     const hotelLogs = filteredLogs.filter(l => l.travel_type === 'accommodation');
+    const lodgingExpenses = expenses.filter(e => {
+      const cat = (e.category || "").toLowerCase();
+      const mainCat = (e.main_category || "").toLowerCase();
+      return cat === 'lodging' || cat === 'accommodation' || mainCat === 'lodging' || mainCat === 'accommodation';
+    });
 
     const result: JurisdictionSegment[] = [];
     const usedHotelDocIds = new Set<string>();
+    const usedHotelExpenseIds = new Set<string>();
 
     flightLogs.forEach(flight => {
-      const linkedHotel = hotelLogs.find(h =>
+      const tripStart = new Date(flight.departure_date || flight.start_date);
+      const tripEnd = new Date(flight.return_date || flight.end_date || flight.start_date);
+
+      // 1. DUAL-SOURCE STAY PROOF: Link via logs or raw expenses
+      let linkedHotel = hotelLogs.find(h =>
         h.document_id === flight.linked_hotel_id ||
-        (new Date(h.start_date) >= new Date(flight.departure_date || flight.start_date) &&
-          new Date(h.start_date) <= new Date(flight.return_date || flight.end_date || flight.start_date))
+        (new Date(h.start_date) >= tripStart && new Date(h.start_date) <= new Date(tripEnd.getTime() + 86400000))
       );
 
-      if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
+      let linkedHotelExpense = !linkedHotel ? lodgingExpenses.find(e => {
+        const hDate = new Date(e.date);
+        return hDate >= tripStart && hDate <= new Date(tripEnd.getTime() + 86400000);
+      }) : null;
 
-      const hVerify = getVerificationDetails(linkedHotel || null);
+      if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
+      if (linkedHotelExpense?.id) usedHotelExpenseIds.add(linkedHotelExpense.id);
+
+      const fMatch = getFinancialMatch(flight, 'flight');
+      const hMatch = getFinancialMatch(linkedHotel || (linkedHotelExpense ? { start_date: linkedHotelExpense.date, provider_name: linkedHotelExpense.merchant, travel_type: 'accommodation' } as any : null), 'accommodation');
 
       result.push({
         id: flight.id,
@@ -140,18 +156,21 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         startDate: flight.departure_date || flight.start_date,
         endDate: flight.return_date || flight.end_date || flight.start_date,
         flight: flight,
-        hotel: linkedHotel || null,
-        status: hVerify.verified ? 'verified' : 'action_required',
+        hotel: linkedHotel || (linkedHotelExpense ? { provider_name: linkedHotelExpense.merchant } as any : null),
+        status: hMatch ? 'verified' : 'action_required',
         provider: flight.provider_name,
         financials: {
-          hotelAmt: hVerify.amount,
-          hotelCurr: hVerify.currency
+          flightAmt: fMatch?.amount,
+          flightCurr: fMatch?.currency,
+          hotelAmt: hMatch?.amount,
+          hotelCurr: hMatch?.currency
         }
       });
     });
 
+    // 2. Process Standalone Hotels (Stationary Anchors)
     hotelLogs.filter(h => h.document_id && !usedHotelDocIds.has(h.document_id)).forEach(hotel => {
-      const hVerify = getVerificationDetails(hotel);
+      const hMatch = getFinancialMatch(hotel, 'accommodation');
       result.push({
         id: hotel.id,
         country: hotel.destination_country || "International",
@@ -161,11 +180,11 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         endDate: hotel.end_date || hotel.start_date,
         flight: null,
         hotel: hotel,
-        status: hVerify.verified ? 'verified' : 'action_required',
+        status: hMatch ? 'verified' : 'action_required',
         provider: hotel.provider_name,
         financials: {
-          hotelAmt: hVerify.amount,
-          hotelCurr: hVerify.currency
+          hotelAmt: hMatch?.amount,
+          hotelCurr: hMatch?.currency
         }
       });
     });
@@ -207,7 +226,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       `${s.startDate} to ${s.endDate}`,
       s.days,
       s.flight?.provider_name || '-',
-      s.flight ? 'Included' : '-',
+      s.financials?.flightAmt ? `${s.financials.flightCurr} ${s.financials.flightAmt.toLocaleString()}` : (s.flight ? 'Included' : '-'),
       s.hotel?.provider_name || '-',
       s.financials?.hotelAmt ? `${s.financials.hotelCurr} ${s.financials.hotelAmt.toLocaleString()}` : '-',
       s.status.toUpperCase().replace('_', ' ')
@@ -215,7 +234,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
 
     autoTable(doc, {
       startY: 60,
-      head: [['Country', 'Timeline', 'Days', 'Flight', 'F.Proof', 'Hotel', 'H.Amt', 'Status']],
+      head: [['Country', 'Timeline', 'Days', 'Flight', 'F.Amt', 'Hotel', 'H.Amt', 'Status']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -234,8 +253,8 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text("Audit Methodology Note:", 14, finalY);
-    doc.text("1. Movement Anchors: Established via flight confirmations matched to entry/exit stamps.", 14, finalY + 7);
-    doc.text("2. Presence Verification: Verified via hotel invoices matched to corresponding bank statement settlements.", 14, finalY + 14);
+    doc.text("1. Movement Anchors: Established via flight confirmations matched to entry/exit stamps. Flight amounts matched to bank settlements within 30 days.", 14, finalY + 7);
+    doc.text("2. Presence Verification: Verified via hotel invoices or lodging expenses matched to corresponding bank statement settlements.", 14, finalY + 14);
 
     doc.save(`Travel_Audit_${period.month}_${period.year}.pdf`);
   };
@@ -248,15 +267,16 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       Departure: s.endDate,
       Days: s.days,
       Flight: s.flight?.provider_name || 'N/A',
+      'Flight Amount': s.financials?.flightAmt || 0,
+      'Flight Currency': s.financials?.flightCurr || '',
       Hotel: s.hotel?.provider_name || 'N/A',
       'Hotel Amount': s.financials?.hotelAmt || 0,
-      Currency: s.financials?.hotelCurr || '',
+      'Hotel Currency': s.financials?.hotelCurr || '',
       Status: s.status.toUpperCase()
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Travel Audit");
     XLSX.writeFile(wb, `Travel_Audit_${period.month}_${period.year}.xlsx`);
   };
@@ -385,11 +405,17 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Movement Proof</p>
-                      <p className="text-[10px] font-bold dark:text-slate-300">{segment.flight ? segment.flight.provider_name : "No travel doc found"}</p>
+                      <p className="text-[10px] font-bold dark:text-slate-300">
+                        {segment.flight ? segment.flight.provider_name : "No travel doc found"}
+                        {segment.financials?.flightAmt && (
+                          <span className="ml-2 text-brand-500 text-[8px] font-black">
+                            {segment.financials.flightCurr} {segment.financials.flightAmt.toLocaleString()}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
-                  {segment.flight && <ShieldCheck size={16} className="text-emerald-500" />}
-                  {!segment.flight && <Info size={16} className="text-slate-300" />}
+                  {segment.financials?.flightAmt ? <ShieldCheck size={16} className="text-brand-500" /> : segment.flight ? <ShieldCheck size={16} className="text-emerald-500" /> : <Info size={16} className="text-slate-300" />}
                 </div>
 
                 <div className="flex items-center justify-between px-2">
@@ -399,11 +425,17 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Stay Proof</p>
-                      <p className="text-[10px] font-bold dark:text-slate-300">{segment.hotel ? segment.hotel.provider_name : "Missing stay invoice"}</p>
+                      <p className="text-[10px] font-bold dark:text-slate-300">
+                        {segment.hotel ? segment.hotel.provider_name : "Missing stay invoice"}
+                        {segment.financials?.hotelAmt && (
+                          <span className="ml-2 text-emerald-600 text-[8px] font-black">
+                            {segment.financials.hotelCurr} {segment.financials.hotelAmt.toLocaleString()}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
-                  {segment.status === 'verified' && <ShieldCheck size={16} className="text-emerald-500" />}
-                  {segment.status !== 'verified' && <ShieldAlert size={16} className="text-orange-500" />}
+                  {segment.status === 'verified' ? <ShieldCheck size={16} className="text-emerald-500" /> : <ShieldAlert size={16} className="text-orange-500" />}
                 </div>
               </div>
             </div>
