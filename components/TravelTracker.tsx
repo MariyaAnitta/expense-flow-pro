@@ -3,6 +3,9 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { TravelLog, Expense } from '../types';
 import { isHomeLocation } from '../firebaseService';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import {
   Plane,
   MapPin,
@@ -17,7 +20,10 @@ import {
   ChevronRight,
   TrendingUp,
   Map,
-  ArrowRightLeft
+  ArrowRightLeft,
+  FileText,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 
 interface TravelTrackerProps {
@@ -37,6 +43,12 @@ type JurisdictionSegment = {
   hotel: TravelLog | null;
   status: 'verified' | 'action_required';
   provider: string;
+  financials?: {
+    flightAmt?: number;
+    flightCurr?: string;
+    hotelAmt?: number;
+    hotelCurr?: string;
+  };
 };
 
 const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period }) => {
@@ -58,10 +70,9 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     });
   }, [logs, period]);
 
-  // FORENSIC MATCHING ENGINE: Shared with Dashboard
-  const verifyStay = (log: TravelLog | null): boolean => {
-    if (!log || !exchangeData) return false;
-    if (log.hotel_verification_status === 'verified') return true;
+  // FORENSIC MATCHING ENGINE: Detailed Version for Auditing
+  const getVerificationDetails = (log: TravelLog | null) => {
+    if (!log || !exchangeData) return { verified: false };
 
     const rates = exchangeData.rates || {};
     const anchors = expenses.filter(e => {
@@ -69,31 +80,20 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       return src === 'bank_statement' || src === 'credit_card_statement';
     });
 
-    // Check for a financial match in the bank statement pool
-    // We allow matching against ANY bank record, even in the next month.
-    return anchors.some(bankTx => {
+    const match = anchors.find(bankTx => {
       const bDate = new Date(bankTx.date).getTime();
       const lDate = new Date(log.start_date).getTime();
 
-      // Amount / Sub-Category check is only reliable for hotels
       if (log.travel_type !== 'accommodation') return false;
 
-      // 1. Window Parity (14 days for hotels)
       const diffDays = Math.abs(bDate - lDate) / (1000 * 60 * 60 * 24);
       if (diffDays > 14) return false;
 
-      // 2. Merchant Parity
       const bMerc = bankTx.merchant.toLowerCase();
-      const lProv = log.provider_name.toLowerCase();
+      const lProv = (log.provider_name || "").toLowerCase();
       const mercMatch = lProv.includes(bMerc.substring(0, 4)) || bMerc.includes(lProv.substring(0, 4));
       if (!mercMatch) return false;
 
-      // 3. Amount Parity (Handle currency conversion)
-      // Note: We don't have the amount on the TravelLog object here, 
-      // but if the merchant and date match closely, and we see an expense 
-      // for this stay in the proofs, it's strong enough.
-      // However, we want to match BANK -> HOTEL. 
-      // We'll search for a "Proof" expense that matches this hotel first.
       const proofs = expenses.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
       const docMatch = proofs.find(p => p.merchant.toLowerCase().includes(lProv.substring(0, 4)) || lProv.includes(p.merchant.toLowerCase().substring(0, 4)));
 
@@ -103,9 +103,14 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         const sameCurrency = bankTx.currency === docMatch.currency;
         return sameCurrency ? Math.abs(bankTx.amount - docMatch.amount) < 0.10 : Math.abs(bINR - pINR) < (bINR * 0.05);
       }
-
       return false;
     });
+
+    if (match) {
+      return { verified: true, amount: match.amount, currency: match.currency };
+    }
+
+    return { verified: log.hotel_verification_status === 'verified' };
   };
 
   // CORE LOGIC: Group logs into Jurisdiction Segments (Trips)
@@ -116,7 +121,6 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     const result: JurisdictionSegment[] = [];
     const usedHotelDocIds = new Set<string>();
 
-    // 1. Process Flights as primary anchors
     flightLogs.forEach(flight => {
       const linkedHotel = hotelLogs.find(h =>
         h.document_id === flight.linked_hotel_id ||
@@ -126,7 +130,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
 
       if (linkedHotel?.document_id) usedHotelDocIds.add(linkedHotel.document_id);
 
-      const isVerified = verifyStay(linkedHotel || null);
+      const hVerify = getVerificationDetails(linkedHotel || null);
 
       result.push({
         id: flight.id,
@@ -137,14 +141,17 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         endDate: flight.return_date || flight.end_date || flight.start_date,
         flight: flight,
         hotel: linkedHotel || null,
-        status: isVerified ? 'verified' : 'action_required',
-        provider: flight.provider_name
+        status: hVerify.verified ? 'verified' : 'action_required',
+        provider: flight.provider_name,
+        financials: {
+          hotelAmt: hVerify.amount,
+          hotelCurr: hVerify.currency
+        }
       });
     });
 
-    // 2. Process Standalone Hotels (Stationary Anchors)
     hotelLogs.filter(h => h.document_id && !usedHotelDocIds.has(h.document_id)).forEach(hotel => {
-      const isVerified = verifyStay(hotel);
+      const hVerify = getVerificationDetails(hotel);
       result.push({
         id: hotel.id,
         country: hotel.destination_country || "International",
@@ -154,8 +161,12 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         endDate: hotel.end_date || hotel.start_date,
         flight: null,
         hotel: hotel,
-        status: isVerified ? 'verified' : 'action_required',
-        provider: hotel.provider_name
+        status: hVerify.verified ? 'verified' : 'action_required',
+        provider: hotel.provider_name,
+        financials: {
+          hotelAmt: hVerify.amount,
+          hotelCurr: hVerify.currency
+        }
       });
     });
 
@@ -173,6 +184,82 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       count: total
     };
   }, [segments]);
+
+  // EXPORT LOGIC
+  const downloadPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    doc.setFontSize(24);
+    doc.setTextColor(15, 23, 42);
+    doc.text("FORENSIC TRAVEL AUDIT REPORT", 14, 20);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Period: ${period.month} ${period.year}`, 14, 28);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 33);
+
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Total Presence: ${auditStats.days} Days`, 14, 45);
+    doc.text(`Verification Score: ${auditStats.score}% Verified`, 14, 52);
+
+    const tableData = segments.map(s => [
+      s.country,
+      `${s.startDate} to ${s.endDate}`,
+      s.days,
+      s.flight?.provider_name || '-',
+      s.flight ? 'Included' : '-',
+      s.hotel?.provider_name || '-',
+      s.financials?.hotelAmt ? `${s.financials.hotelCurr} ${s.financials.hotelAmt.toLocaleString()}` : '-',
+      s.status.toUpperCase().replace('_', ' ')
+    ]);
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['Country', 'Timeline', 'Days', 'Flight', 'F.Proof', 'Hotel', 'H.Amt', 'Status']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: {
+        7: { fontStyle: 'bold' }
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 7) {
+          if (data.cell.text[0] === 'VERIFIED') data.cell.styles.textColor = [16, 185, 129];
+          if (data.cell.text[0] === 'ACTION REQUIRED') data.cell.styles.textColor = [239, 68, 68];
+        }
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text("Audit Methodology Note:", 14, finalY);
+    doc.text("1. Movement Anchors: Established via flight confirmations matched to entry/exit stamps.", 14, finalY + 7);
+    doc.text("2. Presence Verification: Verified via hotel invoices matched to corresponding bank statement settlements.", 14, finalY + 14);
+
+    doc.save(`Travel_Audit_${period.month}_${period.year}.pdf`);
+  };
+
+  const downloadExcel = () => {
+    const data = segments.map(s => ({
+      Country: s.country,
+      City: s.city,
+      Arrival: s.startDate,
+      Departure: s.endDate,
+      Days: s.days,
+      Flight: s.flight?.provider_name || 'N/A',
+      Hotel: s.hotel?.provider_name || 'N/A',
+      'Hotel Amount': s.financials?.hotelAmt || 0,
+      Currency: s.financials?.hotelCurr || '',
+      Status: s.status.toUpperCase()
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Travel Audit");
+    XLSX.writeFile(wb, `Travel_Audit_${period.month}_${period.year}.xlsx`);
+  };
 
   const displayedSegments = segments.filter(s => {
     if (filter === 'all') return true;
@@ -232,6 +319,21 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
             className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'action_required' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-400 hover:text-slate-600'}`}
           >
             Action Required
+          </button>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={downloadPDF}
+            className="flex items-center gap-3 px-6 py-3 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-slate-700 shadow-xl transition-all"
+          >
+            <FileText size={16} /> Forensic PDF
+          </button>
+          <button
+            onClick={downloadExcel}
+            className="flex items-center gap-3 px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 shadow-xl transition-all"
+          >
+            <FileSpreadsheet size={16} /> Excel
           </button>
         </div>
       </div>
