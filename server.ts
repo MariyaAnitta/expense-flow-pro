@@ -79,8 +79,8 @@ try {
 const ai = genkit({
     plugins: [
         vertexAI({
-            location: process.env.VITE_GOOGLE_CLOUD_LOCATION || 'us-east1',
-            projectId: process.env.VITE_GOOGLE_CLOUD_PROJECT || 'sivak-485711',
+            location: process.env.VITE_GOOGLE_CLOUD_LOCATION,
+            projectId: process.env.VITE_GOOGLE_CLOUD_PROJECT,
             googleAuth: credentials
                 ? { credentials }
                 : { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS }
