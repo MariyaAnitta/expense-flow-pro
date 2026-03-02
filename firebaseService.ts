@@ -26,8 +26,8 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+export const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
 
 const sanitize = (data: any, seen = new WeakSet()): any => {
   if (data === null || data === undefined) return data;

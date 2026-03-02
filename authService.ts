@@ -1,6 +1,10 @@
 import bcrypt from 'bcryptjs';
-
-const getSDK = () => (window as any).FirebaseSDK;
+import { db } from './firebaseService';
+import {
+  doc,
+  getDoc,
+  setDoc
+} from 'firebase/firestore';
 
 export interface UserSession {
   email: string;
@@ -10,12 +14,8 @@ export interface UserSession {
 const SALT_ROUNDS = 10;
 
 export const signUp = async (email: string, password: string, recoveryPhrase: string): Promise<UserSession> => {
-  const sdk = getSDK();
-  if (!sdk) throw new Error("Firebase not initialized");
-
-  const { db, doc, getDoc, setDoc } = sdk;
   const userRef = doc(db, 'authorized_users', email.toLowerCase());
-  
+
   // Check if user exists
   const userSnap = await getDoc(userRef);
   if (userSnap.exists()) {
@@ -42,12 +42,8 @@ export const signUp = async (email: string, password: string, recoveryPhrase: st
 };
 
 export const signIn = async (email: string, password: string): Promise<UserSession> => {
-  const sdk = getSDK();
-  if (!sdk) throw new Error("Firebase not initialized");
-
-  const { db, doc, getDoc } = sdk;
   const userRef = doc(db, 'authorized_users', email.toLowerCase());
-  
+
   const userSnap = await getDoc(userRef);
   if (!userSnap.exists()) {
     throw new Error("User not found");
@@ -66,12 +62,8 @@ export const signIn = async (email: string, password: string): Promise<UserSessi
 };
 
 export const resetPassword = async (email: string, recoveryPhrase: string, newPassword: string): Promise<void> => {
-  const sdk = getSDK();
-  if (!sdk) throw new Error("Firebase not initialized");
-
-  const { db, doc, getDoc, setDoc } = sdk;
   const userRef = doc(db, 'authorized_users', email.toLowerCase());
-  
+
   const userSnap = await getDoc(userRef);
   if (!userSnap.exists()) {
     throw new Error("User not found");
@@ -86,9 +78,9 @@ export const resetPassword = async (email: string, recoveryPhrase: string, newPa
 
   // Hash new password
   const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  
-  await setDoc(userRef, { 
-    ...userData, 
+
+  await setDoc(userRef, {
+    ...userData,
     passwordHash: newPasswordHash,
     updatedAt: new Date().toISOString()
   });
