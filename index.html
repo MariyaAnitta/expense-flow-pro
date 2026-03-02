@@ -12,46 +12,7 @@
     rel="stylesheet">
 
 
-  <script type="importmap">
-    {
-      "imports": {
-        "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
-        "react": "https://esm.sh/react@^19.2.3",
-        "react-dom": "https://esm.sh/react-dom@^19.2.3",
-        "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
-        "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-        "bcryptjs": "https://esm.sh/bcryptjs@2.4.3",
-        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-        "react/": "https://esm.sh/react@^19.2.3/"
-      }
-    }
-    </script>
-
-  <!-- Firebase SDK (v10.13.2) -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js';
-    import {
-      getFirestore, collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc,
-      Timestamp, getDocs, where, setDoc, getDoc, limit
-    } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDo4RbYxM2KFj8IuCYjVz2yvV-AoiOTCOE",
-      authDomain: "expense-management-syste-3a5f3.firebaseapp.com",
-      projectId: "expense-management-syste-3a5f3",
-      storageBucket: "expense-management-syste-3a5f3.firebasestorage.app",
-      messagingSenderId: "424295883109",
-      appId: "1:424295883109:web:38b33cdb08b093449d818c"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    window.FirebaseSDK = {
-      db, collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc,
-      Timestamp, getDocs, where, setDoc, getDoc, limit
-    };
-  </script>
+  <!-- Dependencies handled by Vite building /index.tsx -->
 </head>
 
 <body

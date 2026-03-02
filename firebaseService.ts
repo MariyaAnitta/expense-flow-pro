@@ -1,11 +1,33 @@
 
 import { Expense, ReconciliationReport, TravelLog } from './types';
 
-const getSDK = () => {
-  const sdk = (window as any).FirebaseSDK;
-  if (!sdk) return null;
-  return sdk;
+import { initializeApp } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  deleteDoc,
+  doc,
+  setDoc,
+  getDocs,
+  where,
+  Timestamp
+} from 'firebase/firestore';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const sanitize = (data: any, seen = new WeakSet()): any => {
   if (data === null || data === undefined) return data;
@@ -31,9 +53,6 @@ export const isHomeLocation = (log: any) => {
 };
 
 export const subscribeToTravelLogs = (callback: (logs: TravelLog[]) => void, onError?: (error: string) => void) => {
-  const sdk = getSDK();
-  if (!sdk) return () => { };
-  const { db, collection, query, orderBy, onSnapshot } = sdk;
   const q = query(collection(db, 'travel_logs'), orderBy('start_date', 'desc'));
   return onSnapshot(q, (snapshot: any) => {
     const logs = snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as TravelLog);
@@ -50,9 +69,6 @@ const calculateDuration = (start: string, end?: string) => {
 
 export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {
   console.log(`🔥 Firebase: addTravelLogs called for ${logs.length} items`);
-  const sdk = getSDK();
-  if (!sdk) return;
-  const { db, collection, addDoc, getDocs, query, where, doc, setDoc } = sdk;
 
   const initialResults: any[] = [];
   const sortedLogs = [...logs].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
@@ -183,9 +199,6 @@ export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {
 };
 
 export const subscribeToExpenses = (callback: (expenses: Expense[]) => void) => {
-  const sdk = getSDK();
-  if (!sdk) return () => { };
-  const { db, collection, query, orderBy, onSnapshot } = sdk;
   const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
@@ -193,9 +206,6 @@ export const subscribeToExpenses = (callback: (expenses: Expense[]) => void) => 
 };
 
 export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => void) => {
-  const sdk = getSDK();
-  if (!sdk) return () => { };
-  const { db, collection, query, orderBy, onSnapshot } = sdk;
   const q = query(collection(db, 'telegram_receipts'), orderBy('date', 'desc'));
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
@@ -203,9 +213,6 @@ export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => v
 };
 
 export const addExpenses = async (expenses: Omit<Expense, 'id'>[]) => {
-  const sdk = getSDK();
-  if (!sdk) return;
-  const { db, collection, addDoc, getDocs } = sdk;
 
   // Deduplication: Pre-fetch current month's expenses for safety
   const snap = await getDocs(collection(db, 'expenses'));
@@ -227,30 +234,18 @@ export const addExpenses = async (expenses: Omit<Expense, 'id'>[]) => {
 };
 
 export const updateExpense = async (id: string, updates: Partial<Expense>) => {
-  const sdk = getSDK();
-  if (!sdk) return;
-  const { db, doc, setDoc } = sdk;
   return await setDoc(doc(db, 'expenses', id), sanitize(updates), { merge: true });
 };
 
 export const removeExpense = async (id: string) => {
-  const sdk = getSDK();
-  if (!sdk) return;
-  const { db, doc, deleteDoc } = sdk;
   return await deleteDoc(doc(db, 'expenses', id));
 };
 
 export const saveReportToCloud = async (report: ReconciliationReport) => {
-  const sdk = getSDK();
-  if (!sdk) return;
-  const { db, collection, addDoc } = sdk;
   return await addDoc(collection(db, 'reports'), sanitize({ ...report, created_at: new Date().toISOString() }));
 };
 
 export const fetchReportsFromCloud = async (year?: number) => {
-  const sdk = getSDK();
-  if (!sdk) return [];
-  const { db, collection, query, where, getDocs } = sdk;
   const q = year ? query(collection(db, 'reports'), where('year', '==', year)) : query(collection(db, 'reports'));
   const snap = await getDocs(q);
   return snap.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as ReconciliationReport).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.year, 11, 31).getTime());
