@@ -82,6 +82,11 @@ export interface Expense {
     sources?: string[];
     summary?: string;
   };
+
+  // Accountant/Admin verification fields
+  accountant_category?: string;
+  is_verified?: boolean;
+  verified_amount?: number;
 }
 
 export interface ReconciliationResult {
@@ -131,5 +136,6 @@ export enum AppTab {
   TRAVEL = 'travel',
   RECONCILE = 'reconcile',
   REPORTS = 'reports',
-  CLARIFY = 'clarify'
+  CLARIFY = 'clarify',
+  ACCOUNTANT = 'accountant'
 }

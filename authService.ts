@@ -1,92 +1,61 @@
-import bcrypt from 'bcryptjs';
-import { db } from './firebaseService';
 import {
-  doc,
-  getDoc,
-  setDoc
-} from 'firebase/firestore';
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  User,
+  sendPasswordResetEmail
+} from 'firebase/auth';
+import { auth } from './firebaseService';
 
 export interface UserSession {
+  uid: string;
   email: string;
   loginTime: number;
+  isAdmin?: boolean;
 }
 
-const SALT_ROUNDS = 10;
+export const signUp = async (email: string, password: string, _recoveryPhrase?: string): Promise<UserSession> => {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const user = userCredential.user;
 
-export const signUp = async (email: string, password: string, recoveryPhrase: string): Promise<UserSession> => {
-  const userRef = doc(db, 'authorized_users', email.toLowerCase());
+  // Note: Recovery phrase is now handled by Firebase reset emails by default, 
+  // but we can store it in Firestore later if specific multi-factor logic is needed.
 
-  // Check if user exists
-  const userSnap = await getDoc(userRef);
-  if (userSnap.exists()) {
-    throw new Error("User already exists");
-  }
-
-  // Hash credentials
-  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  // Store recovery phrase in a way that's easy to verify but not entirely plain (trim and lowercase)
-  const normalizedRecovery = recoveryPhrase.trim().toLowerCase();
-
-  const userData = {
-    email: email.toLowerCase(),
-    passwordHash,
-    recoveryPhrase: normalizedRecovery,
-    createdAt: new Date().toISOString()
+  const session = {
+    uid: user.uid,
+    email: user.email || '',
+    loginTime: Date.now(),
+    isAdmin: false
   };
-
-  await setDoc(userRef, userData);
-
-  const session = { email: email.toLowerCase(), loginTime: Date.now() };
   localStorage.setItem('expenseflow_session', JSON.stringify(session));
   return session;
 };
 
 export const signIn = async (email: string, password: string): Promise<UserSession> => {
-  const userRef = doc(db, 'authorized_users', email.toLowerCase());
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  const user = userCredential.user;
 
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) {
-    throw new Error("User not found");
-  }
+  // Force refresh token to get latest custom claims (admin status)
+  const idTokenResult = await user.getIdTokenResult(true);
+  const isAdmin = !!idTokenResult.claims.admin;
 
-  const userData = userSnap.data();
-  const isMatch = await bcrypt.compare(password, userData.passwordHash);
-
-  if (!isMatch) {
-    throw new Error("Invalid password");
-  }
-
-  const session = { email: email.toLowerCase(), loginTime: Date.now() };
+  const session = {
+    uid: user.uid,
+    email: user.email || '',
+    loginTime: Date.now(),
+    isAdmin
+  };
   localStorage.setItem('expenseflow_session', JSON.stringify(session));
   return session;
 };
 
-export const resetPassword = async (email: string, recoveryPhrase: string, newPassword: string): Promise<void> => {
-  const userRef = doc(db, 'authorized_users', email.toLowerCase());
-
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) {
-    throw new Error("User not found");
-  }
-
-  const userData = userSnap.data();
-  const normalizedInput = recoveryPhrase.trim().toLowerCase();
-
-  if (userData.recoveryPhrase !== normalizedInput) {
-    throw new Error("Incorrect recovery phrase");
-  }
-
-  // Hash new password
-  const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-
-  await setDoc(userRef, {
-    ...userData,
-    passwordHash: newPasswordHash,
-    updatedAt: new Date().toISOString()
-  });
+export const resetPassword = async (email: string): Promise<void> => {
+  await sendPasswordResetEmail(auth, email);
 };
 
-export const signOut = () => {
+export const signOut = async () => {
+  await firebaseSignOut(auth);
   localStorage.removeItem('expenseflow_session');
 };
 
@@ -98,4 +67,24 @@ export const getSession = (): UserSession | null => {
   } catch {
     return null;
   }
+};
+
+// Listener for auth state changes to keep session in sync
+export const subscribeToAuth = (callback: (session: UserSession | null) => void) => {
+  return onAuthStateChanged(auth, async (user: User | null) => {
+    if (user) {
+      const idTokenResult = await user.getIdTokenResult();
+      const session = {
+        uid: user.uid,
+        email: user.email || '',
+        loginTime: Date.now(),
+        isAdmin: !!idTokenResult.claims.admin
+      };
+      localStorage.setItem('expenseflow_session', JSON.stringify(session));
+      callback(session);
+    } else {
+      localStorage.removeItem('expenseflow_session');
+      callback(null);
+    }
+  });
 };

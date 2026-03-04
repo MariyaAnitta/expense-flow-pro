@@ -33,6 +33,8 @@ import Reports from './components/Reports';
 import Auth from './components/Auth';
 import ClarificationCenter from './components/ClarificationCenter';
 import TravelTracker from './components/TravelTracker';
+import AccountantPanel from './components/AccountantPanel';
+import { subscribeToAuth } from './authService';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<UserSession | null>(getSession());
@@ -56,6 +58,7 @@ const App: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>("October");
   const [selectedYear, setSelectedYear] = useState<number>(2025);
   const [auditBank, setAuditBank] = useState<string>("All Accounts");
+  const [evidenceThreshold, setEvidenceThreshold] = useState<number>(10);
 
   const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -74,6 +77,13 @@ const App: React.FC = () => {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen();
     else document.exitFullscreen();
   };
+
+  useEffect(() => {
+    const unsubAuth = subscribeToAuth((updatedSession) => {
+      setSession(updatedSession);
+    });
+    return () => unsubAuth();
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -238,6 +248,13 @@ const App: React.FC = () => {
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-4 mb-4 mt-8">Audit & Compliance</div>
             <NavItem tab={AppTab.RECONCILE} icon={FileSearch} label="Compliance Audit" />
             <NavItem tab={AppTab.REPORTS} icon={Archive} label="Data Archive" />
+
+            {session.isAdmin && (
+              <>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-4 mb-4 mt-8">Administration</div>
+                <NavItem tab={AppTab.ACCOUNTANT} icon={ShieldCheck} label="Accountant Master" />
+              </>
+            )}
           </nav>
           <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800/60"><div className="bg-slate-50 dark:bg-slate-900/40 rounded-3xl p-5 border border-slate-100 dark:border-slate-800/40"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-2xl bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-600 dark:text-brand-400 font-black text-xs">{session.email.charAt(0).toUpperCase()}</div><div className="overflow-hidden"><p className="text-xs font-black truncate">{session.email}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Financial Admin</p></div></div><div className="flex gap-2"><button onClick={() => setDarkMode(!darkMode)} className="flex-1 flex items-center justify-center py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500">{darkMode ? <Sun size={16} /> : <Moon size={16} />}</button><button onClick={handleLogout} className="flex-1 flex items-center justify-center py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-500"><LogOut size={16} /></button></div></div></div>
         </div>
@@ -272,12 +289,13 @@ const App: React.FC = () => {
         </header>
         <section className="flex-1 overflow-y-auto p-6 bg-[#f8fafc] dark:bg-[#020617]">
           <div className="max-w-screen-xl mx-auto">
-            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={expenses} onDelete={removeExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={handleJumpToClarify} filterBank={auditBank} onFilterBankChange={setAuditBank} />}
+            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={expenses} onDelete={removeExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={setTargetClarifyId} filterBank={auditBank} onFilterBankChange={setAuditBank} session={session} />}
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={travelLogs} expenses={expenses} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.CLARIFY && <ClarificationCenter expenses={expenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />}
-            {activeTab === AppTab.RECONCILE && <Reconciler expenses={expenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} />}
+            {activeTab === AppTab.RECONCILE && <Reconciler expenses={expenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={evidenceThreshold} />}
             {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} />}
+            {activeTab === AppTab.ACCOUNTANT && <AccountantPanel evidenceThreshold={evidenceThreshold} onThresholdChange={setEvidenceThreshold} />}
           </div>
         </section>
       </main>

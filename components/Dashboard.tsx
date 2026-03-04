@@ -18,9 +18,11 @@ import {
   ShieldCheck,
   Plane,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Lock
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
+import { UserSession } from '../authService';
 
 interface DashboardProps {
   expenses: Expense[];
@@ -29,6 +31,7 @@ interface DashboardProps {
   onNavigateToClarify?: (expenseId: string) => void;
   filterBank: string;
   onFilterBankChange: (bank: string) => void;
+  session: UserSession | null;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -37,7 +40,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   period,
   onNavigateToClarify,
   filterBank,
-  onFilterBankChange
+  onFilterBankChange,
+  session
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("All Types");
@@ -489,9 +493,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                     </td>
                     <td className="px-12 py-6 text-right">
-                      <button onClick={() => onDelete(e.id)} className="p-3 text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all active:scale-95">
-                        <Trash2 size={20} />
-                      </button>
+                      {e.is_verified && !session?.isAdmin ? (
+                        <div className="p-3 text-slate-300 cursor-not-allowed">
+                          <Lock size={18} />
+                        </div>
+                      ) : (
+                        <button onClick={() => onDelete(e.id)} className="p-3 text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all active:scale-95">
+                          <Trash2 size={20} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

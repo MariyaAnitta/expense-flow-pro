@@ -1,5 +1,5 @@
-
 import { Expense, ReconciliationReport, TravelLog } from './types';
+import { getSession } from './authService';
 
 import { initializeApp } from 'firebase/app';
 import {
@@ -16,6 +16,7 @@ import {
   where,
   Timestamp
 } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -28,6 +29,7 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
 const sanitize = (data: any, seen = new WeakSet()): any => {
   if (data === null || data === undefined) return data;
@@ -52,13 +54,6 @@ export const isHomeLocation = (log: any) => {
   return /uae|emirates|dubai|united arab emirates/.test(dest);
 };
 
-export const subscribeToTravelLogs = (callback: (logs: TravelLog[]) => void, onError?: (error: string) => void) => {
-  const q = query(collection(db, 'travel_logs'), orderBy('start_date', 'desc'));
-  return onSnapshot(q, (snapshot: any) => {
-    const logs = snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as TravelLog);
-    callback(logs);
-  }, (error: any) => onError?.(error.message));
-};
 
 const calculateDuration = (start: string, end?: string) => {
   const startDate = new Date(start);
@@ -199,16 +194,49 @@ export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {
 };
 
 export const subscribeToExpenses = (callback: (expenses: Expense[]) => void) => {
-  const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
+  const session = getSession();
+  if (!session) return () => { };
+  const q = query(collection(db, 'expenses'), where('user_id', '==', session.email), orderBy('date', 'desc'));
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
   });
 };
 
+// --- ADMIN ONLY METHODS ---
+export const subscribeToAllExpenses = (callback: (expenses: (Expense & { owner_email?: string })[]) => void) => {
+  const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
+  return onSnapshot(q, (snapshot: any) => {
+    const expenses = snapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      return sanitize({ id: doc.id, ...data, owner_email: data.user_id }) as (Expense & { owner_email?: string });
+    });
+    callback(expenses);
+  });
+};
+
+export const verifyExpense = async (id: string, updates: { accountant_category: string, verified_amount: number }) => {
+  return await setDoc(doc(db, 'expenses', id), sanitize({
+    ...updates,
+    is_verified: true,
+    verified_at: new Date().toISOString()
+  }), { merge: true });
+};
+
 export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => void) => {
-  const q = query(collection(db, 'telegram_receipts'), orderBy('date', 'desc'));
+  const session = getSession();
+  if (!session) return () => { };
+  const q = query(collection(db, 'telegram_receipts'), where('user_id', '==', session.email), orderBy('date', 'desc'));
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
+  });
+};
+
+export const subscribeToTravelLogs = (callback: (logs: TravelLog[]) => void) => {
+  const session = getSession();
+  if (!session) return () => { };
+  const q = query(collection(db, 'travel_logs'), where('user_id', '==', session.email), orderBy('start_date', 'desc'));
+  return onSnapshot(q, (snapshot: any) => {
+    callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as TravelLog));
   });
 };
 
@@ -246,7 +274,13 @@ export const saveReportToCloud = async (report: ReconciliationReport) => {
 };
 
 export const fetchReportsFromCloud = async (year?: number) => {
-  const q = year ? query(collection(db, 'reports'), where('year', '==', year)) : query(collection(db, 'reports'));
+  const session = getSession();
+  if (!session || !session.isAdmin) return []; // Reports are currently Admin-only in this implementation
+
+  const q = year
+    ? query(collection(db, 'reports'), where('year', '==', year))
+    : query(collection(db, 'reports'));
+
   const snap = await getDocs(q);
   return snap.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as ReconciliationReport).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.year, 11, 31).getTime());
 };

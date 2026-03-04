@@ -28,15 +28,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
         const session = await signIn(email, password);
         onAuthenticated(session);
       } else if (mode === 'signup') {
-        if (!recoveryPhrase) throw new Error("Please set a recovery phrase");
-        const session = await signUp(email, password, recoveryPhrase);
+        const session = await signUp(email, password);
         onAuthenticated(session);
       } else if (mode === 'reset') {
-        await resetPassword(email, recoveryPhrase, password);
-        setSuccessMsg("Success! Security updated. Please sign in.");
+        await resetPassword(email);
+        setSuccessMsg("Success! Security link sent to your email.");
         setMode('login');
-        setPassword('');
-        setRecoveryPhrase('');
       }
     } catch (err: any) {
       setError(err.message || "Credential verification failed");
@@ -112,34 +109,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
               </div>
             </div>
 
-            {(mode === 'signup' || mode === 'reset') && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between ml-2">
-                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Master Key Phrase</label>
-                  {mode === 'signup' && (
-                    <div className="group relative">
-                      <HelpCircle size={14} className="text-slate-300 cursor-help" />
-                      <div className="absolute bottom-full right-0 mb-3 w-56 p-4 bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-bold rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl leading-relaxed">
-                        Enter a memorable phrase. This is the only way to recover your account without an admin.
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-300 group-focus-within:text-brand-600 transition-colors">
-                    <KeyRound size={20} />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={recoveryPhrase}
-                    onChange={(e) => setRecoveryPhrase(e.target.value)}
-                    placeholder="e.g. Blue Moon Coffee 1989"
-                    className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold focus:bg-white dark:focus:bg-slate-950 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
-                  />
-                </div>
-              </div>
-            )}
+            {/* Recovery Phrase removed in favor of official Firebase email reset flow */}
 
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2">

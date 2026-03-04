@@ -138,6 +138,7 @@ const ExpenseRecordSchema = z.object({
     c: z.string().describe("Currency"),
     d: z.string().describe("Date YYYY-MM-DD"),
     cat: z.enum(['Transport', 'Meals', 'Lodging', 'Office', 'Utilities', 'Salary', 'Transfer', 'General']).describe("Category"),
+    ver: z.boolean().default(false).describe("Always false for raw extraction"),
     items: z.array(z.string()).optional().describe("Line items if visible (e.g. Room Charge, Coffee, etc.)"),
     tax_amount: z.number().optional().describe("Tax or VAT amount if visible"),
     main_category: z.string().optional().describe("Broad classification (Business vs Personal)"),

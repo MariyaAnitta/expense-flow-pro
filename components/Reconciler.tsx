@@ -39,6 +39,7 @@ interface ReconcilerProps {
   period: { month: string; year: number };
   auditBank?: string;
   onBankChange?: (bank: string) => void;
+  evidenceThreshold: number;
 }
 
 const Reconciler: React.FC<ReconcilerProps> = ({
@@ -50,7 +51,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
   isSaving,
   saveSuccess,
   auditBank = "All Accounts",
-  onBankChange
+  onBankChange,
+  evidenceThreshold
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
 
@@ -335,9 +337,10 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       const isMandatory = ['travel', 'hotel', 'flight', 'airline', 'stay', 'flydubai', 'ibis', 'accommodation']
         .some(k => merc.includes(k) || cat.includes(k));
 
-      // 2. OPTIONAL LOGIC (Threshold: 10 AED / ~225 INR)
+      // 2. OPTIONAL LOGIC (Dynamic Threshold)
+      const thresholdINR = evidenceThreshold * 22.5; // Approx conversion if rates not available, but ideally we'd use rates
       const isOptional = ['bank charges', 'transfer', 'vat', 'tax', 'finance', 'charge']
-        .some(k => merc.includes(k) || cat.includes(k)) || amountINR < 225;
+        .some(k => merc.includes(k) || cat.includes(k)) || amountINR < thresholdINR;
 
       if (isMandatory) mandatoryMissing.push(exp);
       else if (isOptional) optionalMissing.push(exp);
