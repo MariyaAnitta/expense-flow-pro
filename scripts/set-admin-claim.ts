@@ -1,11 +1,11 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 dotenv.config({ path: '.env.local' });
 
 // IMPORTANT: Path to your Service Account JSON file downloaded from Firebase Console
-// Settings -> Service Accounts -> Generate new private key
 const SERVICE_ACCOUNT_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
 
 if (!SERVICE_ACCOUNT_PATH) {
@@ -13,9 +13,10 @@ if (!SERVICE_ACCOUNT_PATH) {
     process.exit(1);
 }
 
+let app;
 try {
-    admin.initializeApp({
-        credential: admin.credential.cert(path.resolve(SERVICE_ACCOUNT_PATH))
+    app = initializeApp({
+        credential: cert(path.resolve(SERVICE_ACCOUNT_PATH))
     });
     console.log('✅ Firebase Admin initialized');
 } catch (error) {
@@ -23,10 +24,12 @@ try {
     process.exit(1);
 }
 
+const auth = getAuth(app);
+
 const setAdmin = async (email: string) => {
     try {
-        const user = await admin.auth().getUserByEmail(email);
-        await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+        const user = await auth.getUserByEmail(email);
+        await auth.setCustomUserClaims(user.uid, { admin: true });
         console.log(`🚀 Success! User ${email} (UID: ${user.uid}) is now an Admin.`);
         console.log('💡 Note: The user must sign out and sign back in for the changes to take effect.');
         process.exit(0);
