@@ -6,7 +6,8 @@ import {
   User,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { auth } from './firebaseService';
+import { auth, db } from './firebaseService';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface UserSession {
   uid: string;
@@ -19,8 +20,12 @@ export const signUp = async (email: string, password: string, _recoveryPhrase?: 
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
 
-  // Note: Recovery phrase is now handled by Firebase reset emails by default, 
-  // but we can store it in Firestore later if specific multi-factor logic is needed.
+  // Create Firestore user profile
+  await setDoc(doc(db, 'users', user.uid), {
+    email: user.email,
+    role: 'employee',
+    created_at: new Date().toISOString()
+  });
 
   const session = {
     uid: user.uid,
@@ -36,9 +41,10 @@ export const signIn = async (email: string, password: string): Promise<UserSessi
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
 
-  // Force refresh token to get latest custom claims (admin status)
-  const idTokenResult = await user.getIdTokenResult(true);
-  const isAdmin = !!idTokenResult.claims.admin;
+  // Fetch role from Firestore
+  const userDoc = await getDoc(doc(db, 'users', user.uid));
+  const userData = userDoc.data();
+  const isAdmin = userData?.role === 'admin';
 
   const session = {
     uid: user.uid,
@@ -73,12 +79,15 @@ export const getSession = (): UserSession | null => {
 export const subscribeToAuth = (callback: (session: UserSession | null) => void) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      const idTokenResult = await user.getIdTokenResult();
+      // Fetch role from Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.data();
+
       const session = {
         uid: user.uid,
         email: user.email || '',
         loginTime: Date.now(),
-        isAdmin: !!idTokenResult.claims.admin
+        isAdmin: userData?.role === 'admin'
       };
       localStorage.setItem('expenseflow_session', JSON.stringify(session));
       callback(session);
