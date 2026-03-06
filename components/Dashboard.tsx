@@ -19,7 +19,9 @@ import {
   Plane,
   FileText,
   ChevronDown,
-  Lock
+  Lock,
+  Edit3,
+  Check
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
 import { UserSession } from '../authService';
@@ -27,11 +29,13 @@ import { UserSession } from '../authService';
 interface DashboardProps {
   expenses: Expense[];
   onDelete: (id: string) => void;
+  onUpdate?: (id: string, updates: Partial<Expense>) => void;
   period: { month: string; year: number };
   onNavigateToClarify?: (expenseId: string) => void;
   filterBank: string;
   onFilterBankChange: (bank: string) => void;
   session: UserSession | null;
+  customCategories?: string[];
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -41,7 +45,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToClarify,
   filterBank,
   onFilterBankChange,
-  session
+  session,
+  onUpdate,
+  customCategories = []
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("All Types");
@@ -49,6 +55,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [filterCategory, setFilterCategory] = useState("All Categories");
   const [filterStatus, setFilterStatus] = useState("All Status");
   const [filterSource, setFilterSource] = useState("All Sources");
+  const [editingIdentityId, setEditingIdentityId] = useState<string | null>(null);
+  const [editingClassificationId, setEditingClassificationId] = useState<string | null>(null);
+  const [tempIdentity, setTempIdentity] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
 
   useEffect(() => {
     getExchangeRates().then(setExchangeData);
@@ -396,10 +406,45 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <td className="px-8 py-6">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                            {e.merchant}
-                            {e.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({e.bank})</span>}
-                          </span>
+                          {session?.role === 'admin' && editingIdentityId === e.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                autoFocus
+                                className="bg-slate-50 dark:bg-slate-800 border-2 border-brand-500 rounded-xl px-3 py-1.5 text-xs font-bold w-48 focus:outline-none dark:text-white"
+                                value={tempIdentity}
+                                onChange={(evt) => setTempIdentity(evt.target.value)}
+                                onKeyDown={(evt) => {
+                                  if (evt.key === 'Enter') {
+                                    onUpdate?.(e.id, { merchant: tempIdentity });
+                                    setEditingIdentityId(null);
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => {
+                                  onUpdate?.(e.id, { merchant: tempIdentity });
+                                  setEditingIdentityId(null);
+                                }}
+                                className="p-2 bg-brand-600 text-white rounded-xl"
+                              >
+                                <Check size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              className={`text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight ${session?.role === 'admin' ? 'cursor-pointer hover:text-brand-600 transition-colors' : ''}`}
+                              onClick={() => {
+                                if (session?.role === 'admin') {
+                                  setEditingIdentityId(e.id);
+                                  setTempIdentity(e.merchant);
+                                }
+                              }}
+                            >
+                              {e.merchant}
+                              {session?.role === 'admin' && <Edit3 size={10} className="inline ml-2 opacity-0 group-hover:opacity-40" />}
+                              {e.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({e.bank})</span>}
+                            </span>
+                          )}
                           {isVerified && (
                             <span className="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border border-emerald-100 dark:border-emerald-500/20">
                               <ShieldCheck size={8} className="inline mr-1" /> Verified
@@ -463,9 +508,65 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="px-4 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
-                        {e.category}
-                      </span>
+                      {session?.role === 'admin' ? (
+                        <div className="flex flex-col gap-2">
+                          <select
+                            value={customCategory && editingClassificationId === e.id ? 'Other' : e.category}
+                            onChange={(evt) => {
+                              const val = evt.target.value;
+                              if (val === 'Other') {
+                                setEditingClassificationId(e.id);
+                                setCustomCategory("");
+                              } else {
+                                onUpdate?.(e.id, { category: val });
+                                setEditingClassificationId(null);
+                              }
+                            }}
+                            className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-brand-600 outline-none focus:ring-2 ring-brand-500/20 w-40"
+                          >
+                            {/* Standard and Custom categories */}
+                            {Array.from(new Set(['Transport', 'Meals', 'Lodging', 'Office', 'Utilities', 'Salary', 'Transfer', 'General', ...customCategories, e.category])).map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                            <option value="Other">+ Other / Custom</option>
+                          </select>
+
+                          {editingClassificationId === e.id && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                autoFocus
+                                className="bg-slate-50 dark:bg-slate-800 border-2 border-brand-500 rounded-xl px-3 py-1.5 text-[10px] font-bold w-full focus:outline-none dark:text-white uppercase"
+                                value={customCategory}
+                                placeholder="Add category..."
+                                onChange={(evt) => setCustomCategory(evt.target.value)}
+                                onKeyDown={(evt) => {
+                                  if (evt.key === 'Enter' && customCategory.trim()) {
+                                    onUpdate?.(e.id, { category: customCategory.trim() });
+                                    setEditingClassificationId(null);
+                                    setCustomCategory("");
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => {
+                                  if (customCategory.trim()) {
+                                    onUpdate?.(e.id, { category: customCategory.trim() });
+                                    setEditingClassificationId(null);
+                                    setCustomCategory("");
+                                  }
+                                }}
+                                className="p-1.5 bg-brand-600 text-white rounded-lg shadow-lg"
+                              >
+                                <Check size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="px-4 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
+                          {e.category}
+                        </span>
+                      )}
                     </td>
                     <td className="px-8 py-6">
                       <div className="flex flex-col">

@@ -1,4 +1,4 @@
-import { Expense, ReconciliationReport, TravelLog } from './types';
+import { Expense, ReconciliationReport, TravelLog, AppSettings } from './types';
 import { getSession } from './authService';
 
 import { initializeApp } from 'firebase/app';
@@ -196,7 +196,7 @@ export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {
 export const subscribeToExpenses = (callback: (expenses: Expense[]) => void) => {
   const session = getSession();
   if (!session) return () => { };
-  const q = query(collection(db, 'expenses'), where('user_id', '==', session.email), orderBy('date', 'desc'));
+  const q = query(collection(db, 'expenses'), where('user_id', '==', session.email));
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
   });
@@ -214,6 +214,42 @@ export const subscribeToAllExpenses = (callback: (expenses: (Expense & { owner_e
   });
 };
 
+export const subscribeToAllTravelLogs = (callback: (logs: (TravelLog & { owner_email?: string })[]) => void) => {
+  const q = query(collection(db, 'travel_logs'), orderBy('start_date', 'desc'));
+  return onSnapshot(q, (snapshot: any) => {
+    callback(snapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      return sanitize({ id: doc.id, ...data, owner_email: data.user_id }) as (TravelLog & { owner_email?: string });
+    }));
+  });
+};
+
+export const subscribeToSettings = (callback: (settings: AppSettings) => void) => {
+  const settingsRef = doc(db, 'global_settings', 'audit_config');
+  return onSnapshot(settingsRef, (snapshot) => {
+    if (snapshot.exists()) {
+      callback(snapshot.data() as AppSettings);
+    } else {
+      callback({ audit_threshold: 10, custom_expense_heads: [] }); // Default fallback
+    }
+  });
+};
+
+export const updateSettings = async (updates: Partial<AppSettings>) => {
+  const settingsRef = doc(db, 'global_settings', 'audit_config');
+  return await setDoc(settingsRef, { ...updates, updated_at: new Date().toISOString() }, { merge: true });
+};
+
+export const subscribeToAllTelegramReceipts = (callback: (expenses: (Expense & { owner_email?: string })[]) => void) => {
+  const q = query(collection(db, 'telegram_receipts'), orderBy('date', 'desc'));
+  return onSnapshot(q, (snapshot: any) => {
+    callback(snapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      return sanitize({ id: doc.id, ...data, owner_email: data.user_id }) as (Expense & { owner_email?: string });
+    }));
+  });
+};
+
 export const verifyExpense = async (id: string, updates: { accountant_category: string, verified_amount: number }) => {
   return await setDoc(doc(db, 'expenses', id), sanitize({
     ...updates,
@@ -225,7 +261,7 @@ export const verifyExpense = async (id: string, updates: { accountant_category: 
 export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => void) => {
   const session = getSession();
   if (!session) return () => { };
-  const q = query(collection(db, 'telegram_receipts'), where('user_id', '==', session.email), orderBy('date', 'desc'));
+  const q = query(collection(db, 'telegram_receipts'), where('user_id', '==', session.email));
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
   });
@@ -234,7 +270,7 @@ export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => v
 export const subscribeToTravelLogs = (callback: (logs: TravelLog[]) => void) => {
   const session = getSession();
   if (!session) return () => { };
-  const q = query(collection(db, 'travel_logs'), where('user_id', '==', session.email), orderBy('start_date', 'desc'));
+  const q = query(collection(db, 'travel_logs'), where('user_id', '==', session.email));
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as TravelLog));
   });
@@ -270,7 +306,12 @@ export const removeExpense = async (id: string) => {
 };
 
 export const saveReportToCloud = async (report: ReconciliationReport) => {
-  return await addDoc(collection(db, 'reports'), sanitize({ ...report, created_at: new Date().toISOString() }));
+  const session = getSession();
+  return await addDoc(collection(db, 'reports'), sanitize({
+    ...report,
+    user_id: session?.email,
+    created_at: new Date().toISOString()
+  }));
 };
 
 export const fetchReportsFromCloud = async (year?: number) => {

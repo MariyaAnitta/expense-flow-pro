@@ -1,29 +1,40 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   LayoutDashboard,
-  FileSearch,
+  FileSearch, // Used for Compliance Audit
   TrendingUp,
-  PlusCircle,
-  RefreshCcw,
-  Zap,
-  Archive,
+  UploadCloud, // Changed from PlusCircle for Extractor
+  RefreshCcw, // Used for audit button
   LogOut,
-  User,
-  HelpCircle,
+  HelpCircle, // Used for Resolutions
   Moon,
   Sun,
-  Menu,
-  X,
-  ShieldCheck,
-  Search,
+  Menu, // Used for mobile sidebar toggle
+  X, // Used for mobile sidebar close
+  ShieldCheck, // Used for Account Master and audit button
+  Search, // Not explicitly used as an icon, but good to have if needed
   Maximize,
   Minimize,
-  Plane
+  Plane, // Used for Travel Tracker
+  History, // Changed from Archive for Data Archive
+  Settings // Used for System Settings
 } from 'lucide-react';
-import { Expense, AppTab, ReconciliationResult, ReconciliationReport, TravelLog } from './types';
+import { Expense, AppTab, ReconciliationResult, ReconciliationReport, TravelLog, AppSettings } from './types'; // Added AppSettings
 import { reconcileData } from './geminiService';
-import { subscribeToExpenses, subscribeToTelegramReceipts, subscribeToTravelLogs, addExpenses, addTravelLogs, removeExpense, updateExpense } from './firebaseService';
+import {
+  subscribeToExpenses,
+  subscribeToTelegramReceipts,
+  subscribeToTravelLogs,
+  addExpenses,
+  addTravelLogs,
+  removeExpense,
+  updateExpense,
+  subscribeToAllExpenses,
+  subscribeToAllTelegramReceipts,
+  subscribeToAllTravelLogs,
+  subscribeToSettings, // Added
+  updateSettings // Added
+} from './firebaseService';
 import { getSession, signOut, UserSession } from './authService';
 import { saveReconciliation } from './backendService';
 import Dashboard from './components/Dashboard';
@@ -33,7 +44,8 @@ import Reports from './components/Reports';
 import Auth from './components/Auth';
 import ClarificationCenter from './components/ClarificationCenter';
 import TravelTracker from './components/TravelTracker';
-import AccountantPanel from './components/AccountantPanel';
+import AccountMaster from './components/AccountMaster.tsx';
+import SystemSettings from './components/SystemSettings.tsx';
 import { subscribeToAuth } from './authService';
 
 const App: React.FC = () => {
@@ -59,8 +71,11 @@ const App: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(2025);
   const [auditBank, setAuditBank] = useState<string>("All Accounts");
   const [evidenceThreshold, setEvidenceThreshold] = useState<number>(10);
+  const [targetAuditee, setTargetAuditee] = useState<string>("Self"); // "Self" or employee email
 
   const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  const [appSettings, setAppSettings] = useState<AppSettings>({ audit_threshold: 10, custom_expense_heads: [] }); // Added appSettings state
 
   useEffect(() => {
     if (darkMode) { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); }
@@ -86,17 +101,77 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const unsub = subscribeToSettings(setAppSettings); // Subscribing to settings
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     if (!session) return;
-    const unsubInternal = subscribeToExpenses(setInternalExpenses);
-    const unsubTelegram = subscribeToTelegramReceipts(setTelegramExpenses);
-    const unsubTravel = subscribeToTravelLogs(setTravelLogs);
-    return () => { unsubInternal(); unsubTelegram(); unsubTravel(); };
+
+    let unsubInternal: () => void;
+    let unsubTelegram: () => void;
+    let unsubTravel: () => void;
+
+    if (session.role === 'admin') { // Changed from session.isAdmin
+      // Admin sees everything
+      unsubInternal = subscribeToAllExpenses(setInternalExpenses);
+      unsubTelegram = subscribeToAllTelegramReceipts(setTelegramExpenses);
+      unsubTravel = subscribeToAllTravelLogs(setTravelLogs);
+    } else {
+      // Employee sees only their own
+      unsubInternal = subscribeToExpenses(setInternalExpenses);
+      unsubTelegram = subscribeToTelegramReceipts(setTelegramExpenses);
+      unsubTravel = subscribeToTravelLogs(setTravelLogs);
+    }
+
+    return () => {
+      unsubInternal?.();
+      unsubTelegram?.();
+      unsubTravel?.();
+    };
   }, [session]);
 
-  const expenses = useMemo(() => {
+  // UNIFIED FILTERING LOGIC
+  const currentUserEmail = targetAuditee === "Self" ? session?.email : targetAuditee;
+
+  const filteredExpenses = useMemo(() => {
     const combined = [...internalExpenses, ...telegramExpenses];
-    return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [internalExpenses, telegramExpenses]);
+
+    // IF ON DASHBOARD: Admin sees ONLY their own data
+    // IF ON ACCOUNT MASTER: Admin sees FILTERED/GLOBAL data
+    const isDashboard = activeTab === AppTab.DASHBOARD;
+    const effectiveAuditee = isDashboard ? "Self" : targetAuditee;
+    const auditeeEmail = effectiveAuditee === "Self" ? session?.email : effectiveAuditee;
+
+    return combined
+      .filter(e => {
+        const uId = (e as any).user_id || (e as any).owner_email;
+        const userMatch = !auditeeEmail || auditeeEmail === "All Employees" || uId === auditeeEmail;
+
+        // Month/Year filter for non-dashboard views if needed,
+        // but user specifically mentioned sorting by year/month in Account Master
+        return userMatch;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [internalExpenses, telegramExpenses, targetAuditee, session, activeTab]);
+
+  const filteredTravelLogs = useMemo(() => {
+    return travelLogs.filter(l => {
+      const uId = (l as any).user_id || (l as any).owner_email;
+      const matchesUser = !currentUserEmail || uId === currentUserEmail;
+
+      if (!l.start_date) return matchesUser;
+
+      const parts = l.start_date.split('-');
+      if (parts.length < 2) return matchesUser;
+
+      const lYear = parseInt(parts[0]);
+      const lMonthIndex = parseInt(parts[1]) - 1;
+      const matchesPeriod = lYear === selectedYear && (selectedMonth === "All Months" || monthsList[lMonthIndex] === selectedMonth);
+
+      return matchesUser && matchesPeriod;
+    });
+  }, [travelLogs, currentUserEmail, selectedMonth, selectedYear, monthsList]);
 
   const handleLogout = () => { signOut(); setSession(null); };
 
@@ -123,7 +198,7 @@ const App: React.FC = () => {
 
       if (data.expenses.some(e => e.needs_clarification)) {
         console.log("   - Clarification needed, switching tab.");
-        setActiveTab(AppTab.CLARIFY);
+        setActiveTab(AppTab.RESOLVE); // Changed from AppTab.CLARIFY
       } else if (data.travelLogs.length > 0) {
         console.log("   - Travel data found, switching tab.");
         setActiveTab(AppTab.TRAVEL);
@@ -150,7 +225,7 @@ const App: React.FC = () => {
 
   const handleJumpToClarify = useCallback((id: string) => {
     setTargetClarifyId(id);
-    setActiveTab(AppTab.CLARIFY);
+    setActiveTab(AppTab.RESOLVE); // Changed from AppTab.CLARIFY
   }, []);
 
   /**
@@ -161,7 +236,7 @@ const App: React.FC = () => {
     setIsProcessing(true);
     try {
       // 1. ANCHORS: Only Bank/Card records for the selected month
-      const anchorsInPeriod = expenses.filter(e => {
+      const anchorsInPeriod = filteredExpenses.filter(e => {
         const src = String(e.source || '').toLowerCase().trim();
         const isBankAnchor = src === 'bank_statement' || src === 'credit_card_statement';
         if (!isBankAnchor || !e.date) return false;
@@ -189,7 +264,7 @@ const App: React.FC = () => {
       });
 
       // 2. PROOF POOL: Everything else (Receipts, Telegram, etc.)
-      const allProofs = expenses.filter(e => {
+      const allProofs = filteredExpenses.filter(e => {
         const src = String(e.source || '').toLowerCase().trim();
         return src !== 'bank_statement' && src !== 'credit_card_statement';
       });
@@ -220,7 +295,7 @@ const App: React.FC = () => {
 
   if (!session) return <Auth onAuthenticated={(sess) => setSession(sess)} />;
 
-  const clarificationCount = expenses.filter(e => (!e.category || e.category === 'Unknown' || (e.confidence || 0) < 0.7 || e.needs_clarification)).length;
+  const clarificationCount = filteredExpenses.filter(e => (!e.category || e.category === 'Unknown' || (e.confidence || 0) < 0.7 || e.needs_clarification)).length;
 
   const NavItem = ({ tab, icon: Icon, label, count }: { tab: AppTab, icon: any, label: string, count?: number }) => (
     <button
@@ -241,20 +316,24 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between mb-12 px-2"><div className="flex items-center gap-3"><div className="bg-brand-600 p-2.5 rounded-2xl text-white"><TrendingUp size={22} /></div><span className="text-xl font-black tracking-tighter">ExpenseFlow</span></div><button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400"><X /></button></div>
           <nav className="flex-1 space-y-2">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-4 mb-4">Operations</div>
-            <NavItem tab={AppTab.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
-            <NavItem tab={AppTab.EXTRACT} icon={PlusCircle} label="Upload Document" />
-            <NavItem tab={AppTab.TRAVEL} icon={Plane} label="Travel Tracker" />
-            <NavItem tab={AppTab.CLARIFY} icon={HelpCircle} label="Resolutions" count={clarificationCount} />
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-4 mb-4 mt-8">Audit & Compliance</div>
-            <NavItem tab={AppTab.RECONCILE} icon={FileSearch} label="Compliance Audit" />
-            <NavItem tab={AppTab.REPORTS} icon={Archive} label="Data Archive" />
+            <div className="flex flex-col gap-2">
+              <NavItem tab={AppTab.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
+              <NavItem tab={AppTab.EXTRACT} icon={UploadCloud} label="Upload Document" /> {/* Changed icon */}
+              <NavItem tab={AppTab.TRAVEL} icon={Plane} label="Travel Tracker" />
+              <NavItem tab={AppTab.RESOLVE} icon={HelpCircle} label="Resolutions" count={clarificationCount} /> {/* Changed tab name */}
 
-            {session.isAdmin && (
-              <>
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-4 mb-4 mt-8">Administration</div>
-                <NavItem tab={AppTab.ACCOUNTANT} icon={ShieldCheck} label="Accountant Master" />
-              </>
-            )}
+              <div className="mt-8 mb-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] opacity-50">Audit & Compliance</div>
+              <NavItem tab={AppTab.RECONCILE} icon={FileSearch} label="Compliance Audit" />
+              <NavItem tab={AppTab.REPORTS} icon={History} label="Data Archive" /> {/* Changed icon */}
+
+              {session.role === 'admin' && ( // Changed from session.isAdmin
+                <>
+                  <div className="mt-8 mb-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] opacity-50">Administration</div>
+                  <NavItem tab={AppTab.ACCOUNT_MASTER} icon={ShieldCheck} label="Account Master" /> {/* Changed tab name */}
+                  <NavItem tab={AppTab.SYSTEM_SETTINGS} icon={Settings} label="System Settings" /> {/* Added */}
+                </>
+              )}
+            </div>
           </nav>
           <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800/60"><div className="bg-slate-50 dark:bg-slate-900/40 rounded-3xl p-5 border border-slate-100 dark:border-slate-800/40"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-2xl bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-600 dark:text-brand-400 font-black text-xs">{session.email.charAt(0).toUpperCase()}</div><div className="overflow-hidden"><p className="text-xs font-black truncate">{session.email}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Financial Admin</p></div></div><div className="flex gap-2"><button onClick={() => setDarkMode(!darkMode)} className="flex-1 flex items-center justify-center py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500">{darkMode ? <Sun size={16} /> : <Moon size={16} />}</button><button onClick={handleLogout} className="flex-1 flex items-center justify-center py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-500"><LogOut size={16} /></button></div></div></div>
         </div>
@@ -289,13 +368,32 @@ const App: React.FC = () => {
         </header>
         <section className="flex-1 overflow-y-auto p-6 bg-[#f8fafc] dark:bg-[#020617]">
           <div className="max-w-screen-xl mx-auto">
-            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={expenses} onDelete={removeExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={setTargetClarifyId} filterBank={auditBank} onFilterBankChange={setAuditBank} session={session} />}
+            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={filteredExpenses} onDelete={removeExpense} onUpdate={updateExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={setTargetClarifyId} filterBank={auditBank} onFilterBankChange={setAuditBank} session={session} customCategories={appSettings.custom_expense_heads} />}
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
-            {activeTab === AppTab.TRAVEL && <TravelTracker logs={travelLogs} expenses={expenses} period={{ month: selectedMonth, year: selectedYear }} />}
-            {activeTab === AppTab.CLARIFY && <ClarificationCenter expenses={expenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />}
-            {activeTab === AppTab.RECONCILE && <Reconciler expenses={expenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={evidenceThreshold} />}
+            {activeTab === AppTab.TRAVEL && <TravelTracker logs={filteredTravelLogs} expenses={filteredExpenses} period={{ month: selectedMonth, year: selectedYear }} />}
+            {activeTab === AppTab.RESOLVE && <ClarificationCenter expenses={filteredExpenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />} {/* Changed tab name */}
+            {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} />} {/* Passed appSettings.audit_threshold */}
             {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} />}
-            {activeTab === AppTab.ACCOUNTANT && <AccountantPanel evidenceThreshold={evidenceThreshold} onThresholdChange={setEvidenceThreshold} />}
+            {activeTab === AppTab.ACCOUNT_MASTER && (
+              <AccountMaster
+                expenses={filteredExpenses}
+                travelLogs={filteredTravelLogs}
+                targetAuditee={targetAuditee}
+                onAuditeeChange={setTargetAuditee}
+                period={{ month: selectedMonth, year: selectedYear }}
+                onMonthChange={setSelectedMonth}
+                onYearChange={setSelectedYear}
+                settings={appSettings}
+                customCategories={appSettings.custom_expense_heads}
+                allExpenses={[...internalExpenses, ...telegramExpenses]}
+              />
+            )}
+            {activeTab === AppTab.SYSTEM_SETTINGS && (
+              <SystemSettings
+                settings={appSettings}
+                onUpdate={updateSettings}
+              />
+            )}
           </div>
         </section>
       </main>

@@ -14,6 +14,7 @@ export interface UserSession {
   email: string;
   loginTime: number;
   isAdmin?: boolean;
+  role: 'admin' | 'employee';
 }
 
 export const signUp = async (email: string, password: string, _recoveryPhrase?: string): Promise<UserSession> => {
@@ -21,17 +22,18 @@ export const signUp = async (email: string, password: string, _recoveryPhrase?: 
   const user = userCredential.user;
 
   // Create Firestore user profile
-  await setDoc(doc(db, 'users', user.uid), {
+  await setDoc(doc(db, 'authorized_users', user.uid), {
     email: user.email,
     role: 'employee',
-    created_at: new Date().toISOString()
+    createdAt: new Date().toISOString()
   });
 
   const session = {
     uid: user.uid,
     email: user.email || '',
     loginTime: Date.now(),
-    isAdmin: false
+    isAdmin: false,
+    role: 'employee' as const
   };
   localStorage.setItem('expenseflow_session', JSON.stringify(session));
   return session;
@@ -42,7 +44,18 @@ export const signIn = async (email: string, password: string): Promise<UserSessi
   const user = userCredential.user;
 
   // Fetch role from Firestore
-  const userDoc = await getDoc(doc(db, 'users', user.uid));
+  let userDoc = await getDoc(doc(db, 'authorized_users', user.uid));
+
+  // If user profile doesn't exist (e.g., legacy user), create it now
+  if (!userDoc.exists()) {
+    await setDoc(doc(db, 'authorized_users', user.uid), {
+      email: user.email,
+      role: 'employee',
+      createdAt: new Date().toISOString()
+    });
+    userDoc = await getDoc(doc(db, 'authorized_users', user.uid));
+  }
+
   const userData = userDoc.data();
   const isAdmin = userData?.role === 'admin';
 
@@ -50,7 +63,8 @@ export const signIn = async (email: string, password: string): Promise<UserSessi
     uid: user.uid,
     email: user.email || '',
     loginTime: Date.now(),
-    isAdmin
+    isAdmin,
+    role: (userData?.role || 'employee') as 'admin' | 'employee'
   };
   localStorage.setItem('expenseflow_session', JSON.stringify(session));
   return session;
@@ -79,15 +93,25 @@ export const getSession = (): UserSession | null => {
 export const subscribeToAuth = (callback: (session: UserSession | null) => void) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      // Fetch role from Firestore
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.data();
+      // Fetch/Create role in Firestore
+      let userDoc = await getDoc(doc(db, 'authorized_users', user.uid));
 
+      if (!userDoc.exists()) {
+        await setDoc(doc(db, 'authorized_users', user.uid), {
+          email: user.email || '',
+          role: 'employee',
+          createdAt: new Date().toISOString()
+        });
+        userDoc = await getDoc(doc(db, 'authorized_users', user.uid));
+      }
+
+      const userData = userDoc.data();
       const session = {
         uid: user.uid,
         email: user.email || '',
         loginTime: Date.now(),
-        isAdmin: userData?.role === 'admin'
+        isAdmin: userData?.role === 'admin',
+        role: (userData?.role || 'employee') as 'admin' | 'employee'
       };
       localStorage.setItem('expenseflow_session', JSON.stringify(session));
       callback(session);

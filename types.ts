@@ -130,12 +130,19 @@ export interface ReconciliationReport {
   is_local?: boolean;
 }
 
+export interface AppSettings {
+  audit_threshold: number;
+  custom_expense_heads: string[];
+  updated_at?: string;
+}
+
 export enum AppTab {
   DASHBOARD = 'dashboard',
   EXTRACT = 'extract',
   TRAVEL = 'travel',
   RECONCILE = 'reconcile',
   REPORTS = 'reports',
-  CLARIFY = 'clarify',
-  ACCOUNTANT = 'accountant'
+  RESOLVE = 'resolve',
+  ACCOUNT_MASTER = 'account_master',
+  SYSTEM_SETTINGS = 'system_settings'
 }

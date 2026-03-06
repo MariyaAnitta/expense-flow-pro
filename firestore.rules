@@ -6,7 +6,7 @@ service cloud.firestore {
     // Helper function to check if user is an admin via Firestore lookup
     function isAdmin() {
       return request.auth != null && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+             get(/databases/$(database)/documents/authorized_users/$(request.auth.uid)).data.role == 'admin';
     }
 
     // Helper function to check if the document belongs to the requesting user
@@ -14,8 +14,8 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // --- USERS COLLECTION ---
-    match /users/{userId} {
+    // --- AUTHORIZED USERS COLLECTION ---
+    match /authorized_users/{userId} {
       // Users can read their own profile
       allow read: if isOwner(userId) || isAdmin();
       // Only admins can change roles, but users can create their own 'employee' profile
