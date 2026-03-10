@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Expense } from '../types';
+import { convertToUSD } from '../currencyService';
 import {
   Receipt,
   CreditCard,
@@ -175,13 +176,13 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const stats = useMemo(() => {
     const rates = exchangeData?.rates || {};
-    const totalINR = filteredExpenses.reduce((acc, curr) => acc + convertToINR(curr.amount, curr.currency, rates), 0);
+    const totalUSD = filteredExpenses.reduce((acc, curr) => acc + convertToUSD(curr.amount, curr.currency, rates), 0);
     const count = filteredExpenses.length;
     const sources = filteredExpenses.reduce((acc: any, curr) => {
       acc[curr.source] = (acc[curr.source] || 0) + 1;
       return acc;
     }, {});
-    return { totalINR, count, sources };
+    return { totalUSD, count, sources };
   }, [filteredExpenses, exchangeData]);
 
   const formatTime = (isoString?: string) => {
@@ -243,7 +244,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="absolute top-0 right-0 p-8 opacity-20"><Banknote size={80} /></div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Portfolio Burn</p>
-            <h4 className="text-4xl font-black tracking-tighter mt-1">₹{stats.totalINR.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h4>
+            <h4 className="text-4xl font-black tracking-tighter mt-1">${stats.totalUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h4>
           </div>
           <div className="bg-white/20 w-fit px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">
             {stats.count} Transacts
@@ -572,6 +573,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <div className="flex flex-col">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.currency}</span>
                         <span className="text-sm font-black text-slate-900 dark:text-white">{e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        {e.currency !== 'USD' && (
+                          <span className="text-[10px] font-black text-brand-600 dark:text-brand-400 uppercase tracking-widest mt-0.5">
+                            ≈ ${convertToUSD(e.amount, e.currency, exchangeData?.rates || {}).toFixed(2)}
+                          </span>
+                        )}
                         <span className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest mt-0.5">Gross Value</span>
                       </div>
                     </td>

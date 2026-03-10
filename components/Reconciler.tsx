@@ -22,9 +22,11 @@ import {
   Receipt,
   FileText,
   Plus,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck as AuditShield,
+  Calendar as AuditCalendar
 } from 'lucide-react';
-import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
+import { getExchangeRates, convertToUSD, ExchangeRates } from '../currencyService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -241,12 +243,12 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       const rDate = new Date(receipt.date).getTime();
       const diffDays = Math.abs(bDate - rDate) / (1000 * 60 * 60 * 24);
 
-      const bINR = convertToINR(bank.amount, bank.currency, rates);
-      const rINR = convertToINR(receipt.amount, receipt.currency, rates);
+      const bUSD = convertToUSD(bank.amount, bank.currency, rates);
+      const rUSD = convertToUSD(receipt.amount, receipt.currency, rates);
 
       // FOR CROSS-CURRENCY: Allow 5% margin if AI suggested it
       const sameCurrency = bank.currency === receipt.currency;
-      const sameAmt = sameCurrency ? Math.abs(bank.amount - receipt.amount) < 0.10 : Math.abs(bINR - rINR) < (bINR * 0.05);
+      const sameAmt = sameCurrency ? Math.abs(bank.amount - receipt.amount) < 0.10 : Math.abs(bUSD - rUSD) < (bUSD * 0.05);
 
       // MERCHANT SYNONYM CHECK
       const bMerc = bank.merchant.toLowerCase();
@@ -278,8 +280,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
     unmatchedAnchors.forEach(bankTx => {
       // Find a forensic match: same amount + 3-day window + fuzzy merchant
       const autoMatch = availableReceipts.find(rec => {
-        const bINR = convertToINR(bankTx.amount, bankTx.currency, rates);
-        const rINR = convertToINR(rec.amount, rec.currency, rates);
+        const bUSD = convertToUSD(bankTx.amount, bankTx.currency, rates);
+        const rUSD = convertToUSD(rec.amount, rec.currency, rates);
 
         // Date Clearance Window Logic
         const bDate = new Date(bankTx.date).getTime();
@@ -303,7 +305,7 @@ const Reconciler: React.FC<ReconcilerProps> = ({
 
         // CURRENCY-AWARE PARITY
         const sameCurrency = bankTx.currency === rec.currency;
-        const sameAmtVal = sameCurrency ? Math.abs(bankTx.amount - rec.amount) < 0.10 : Math.abs(bINR - rINR) < (bINR * 0.05);
+        const sameAmtVal = sameCurrency ? Math.abs(bankTx.amount - rec.amount) < 0.10 : Math.abs(bUSD - rUSD) < (bUSD * 0.05);
 
         // SOURCE INTEGRITY: Heuristic receipt must NOT be from a bank source
         const validSource = !isAnchor(rec);
@@ -331,7 +333,7 @@ const Reconciler: React.FC<ReconcilerProps> = ({
     const optionalMissing: Expense[] = [];
 
     finalUnmatchedBankTx.forEach(exp => {
-      const amountINR = convertToINR(exp.amount, exp.currency, rates);
+      const amountUSD = convertToUSD(exp.amount, exp.currency, rates);
       const merc = (exp.merchant || '').toLowerCase();
       const cat = (exp.category || '').toLowerCase();
 
@@ -339,10 +341,9 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       const isMandatory = ['travel', 'hotel', 'flight', 'airline', 'stay', 'flydubai', 'ibis', 'accommodation']
         .some(k => merc.includes(k) || cat.includes(k));
 
-      // 2. OPTIONAL LOGIC (Dynamic Threshold)
-      const thresholdINR = convertToINR(evidenceThreshold, 'AED', rates);
+      // 2. OPTIONAL LOGIC (Dynamic Threshold in USD)
       const isOptional = ['bank charges', 'transfer', 'vat', 'tax', 'finance', 'charge']
-        .some(k => merc.includes(k) || cat.includes(k)) || amountINR < thresholdINR;
+        .some(k => merc.includes(k) || cat.includes(k)) || amountUSD < evidenceThreshold;
 
       if (isMandatory) mandatoryMissing.push(exp);
       else if (isOptional) optionalMissing.push(exp);
@@ -359,13 +360,16 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       fullReport: {
         month: period.month,
         year: period.year,
-        matched_transactions: matchedPairs.map(p => p.bank!).filter(Boolean),
+        matched_transactions: matchedPairs.map(p => p.bank).filter(Boolean) as Expense[],
+        matched_receipts: matchedPairs.map(p => p.receipt).filter(Boolean) as Expense[],
         mandatory_missing: mandatoryMissing,
         optional_missing: optionalMissing,
         standard_missing: standardMissing,
         summary: {
           total_matched: matchedPairs.length,
           total_unmatched: finalUnmatchedBankTx.length,
+          matched_amount: matchedPairs.reduce((acc, p) => acc + (p.bank?.amount || 0), 0),
+          unmatched_amount: finalUnmatchedBankTx.reduce((acc, b) => acc + (b.amount || 0), 0),
           compliance_score: score,
           mandatory_error_count: mandatoryMissing.length,
           warning_count: standardMissing.length,
@@ -517,13 +521,38 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                             <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[8px] px-2 py-0.5 rounded-full font-black">POOL</span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">
-                          {pair.receipt?.date}
-                          {pair.receipt?.usage_history && pair.receipt.usage_history.length > 0 && (
-                            <span className="ml-2 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/40 px-2 py-0.5 rounded-md">
-                              Used by {pair.receipt.usage_history[pair.receipt.usage_history.length - 1].user.split('@')[0]}
-                            </span>
-                          )}
+                        <div className="mt-1.5">
+                          {(() => {
+                            const history = pair.receipt?.usage_history || [];
+                            const latestLog = history[history.length - 1];
+                            const isShared = pair.receipt?.user_id === 'SHARED_POOL';
+                            const receiptOwner = pair.receipt?.user_id;
+
+                            // SMART VISIBILITY: Hide if auditor is the same as the original owner (Personal items)
+                            const shouldShow = latestLog && (isShared || latestLog.user !== receiptOwner);
+
+                            if (!shouldShow) return <div className="text-[9px] text-slate-400 font-bold uppercase">{pair.receipt?.date}</div>;
+
+                            return (
+                              <div className="flex flex-col gap-1 group/audit relative">
+                                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-500/30 px-3 py-1 rounded-xl shadow-sm transition-all hover:shadow-md">
+                                  <div className="p-1 bg-amber-600 rounded-lg text-white">
+                                    <AuditShield size={10} />
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest leading-none mb-0.5">Used By</span>
+                                    <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight leading-none">
+                                      {latestLog.user.split('@')[0]}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-[8px] text-slate-400 font-bold uppercase ml-1 flex items-center gap-1">
+                                  <AuditCalendar size={8} />
+                                  {pair.receipt?.date}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>

@@ -326,18 +326,39 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                             </span>
                                         </td>
                                         <td className="px-8 py-6">
-                                            {expense.usage_history && expense.usage_history.length > 0 ? (
-                                                <div className="flex flex-col gap-1">
-                                                    {expense.usage_history.slice(-1).map((log, i) => (
-                                                        <div key={i} className="text-[9px] font-bold text-slate-500 uppercase">
-                                                            <span className="text-brand-600">USED BY:</span> {log.user.split('@')[0]}
-                                                            <div className="text-[8px] text-slate-400">{new Date(log.date).toLocaleDateString()} {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                            {(() => {
+                                                const history = expense.usage_history || [];
+                                                const latestLog = history[history.length - 1];
+                                                const receiptOwner = expense.user_id || (expense as any).owner_email;
+                                                const isShared = receiptOwner === 'SHARED_POOL';
+
+                                                // Show if it's shared pool OR if someone else (like an Admin) used it
+                                                const shouldShow = latestLog && (isShared || latestLog.user !== receiptOwner);
+
+                                                if (!shouldShow) {
+                                                    return <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest italic">Personal</span>;
+                                                }
+
+                                                return (
+                                                    <div className="flex flex-col gap-1 group/audit relative">
+                                                        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-brand-50 to-indigo-50 dark:from-brand-900/20 dark:to-indigo-900/20 border border-brand-100 dark:border-brand-500/30 px-3 py-1.5 rounded-xl shadow-sm group-hover/audit:shadow-md transition-all">
+                                                            <div className="p-1 bg-brand-600 rounded-lg text-white">
+                                                                <ShieldCheck size={10} />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[8px] font-black text-brand-600 dark:text-brand-400 uppercase tracking-widest leading-none mb-0.5">Audited By</span>
+                                                                <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight leading-none">
+                                                                    {latestLog.user.split('@')[0]}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest italic">No History</span>
-                                            )}
+                                                        <div className="text-[8px] text-slate-400 font-bold uppercase ml-1 flex items-center gap-1">
+                                                            <Calendar size={8} />
+                                                            {new Date(latestLog.date).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                     </tr>
                                 ))}

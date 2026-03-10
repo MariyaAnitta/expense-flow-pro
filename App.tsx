@@ -236,10 +236,11 @@ const App: React.FC = () => {
       await saveReconciliation(report);
 
       // Audit Trail Implementation: Log usage for all receipts matched in this period
-      const matchedReceipts = report.matched_transactions.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
-      for (const receipt of matchedReceipts) {
-        if (receipt.id) {
-          await logReceiptUsage(receipt.id, session?.email || 'unknown', 'Matched during Audit');
+      const receiptsToLog = report.matched_receipts || [];
+      console.log(`📝 App: Logging usage for ${receiptsToLog.length} receipts...`);
+      for (const receipt of receiptsToLog) {
+        if (session?.email && receipt.id) {
+          await logReceiptUsage(receipt.id, session.email, 'Matched during Audit');
         }
       }
 

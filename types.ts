@@ -123,6 +123,7 @@ export interface ReconciliationReport {
   month: string;
   year: number;
   matched_transactions: Expense[];
+  matched_receipts?: Expense[]; // New field for audit logging
   mandatory_missing: Expense[];
   optional_missing: Expense[];
   standard_missing: Expense[];

@@ -54,7 +54,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ settings, onUpdate }) =
                         <div>
                             <h4 className="text-sm font-black dark:text-white uppercase tracking-wider mb-2">Mandatory Proof Threshold</h4>
                             <p className="text-xs font-medium text-slate-500 max-w-lg leading-relaxed">
-                                Any expense above this amount will require a verified receipt or invoice for reconciliation.
+                                Any expense above this amount (converted to USD) will require a verified receipt or invoice for reconciliation.
                             </p>
                         </div>
                         <div className="inline-flex py-1.5 px-4 bg-brand-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest text-center whitespace-nowrap shrink-0 items-center justify-center">
@@ -65,7 +65,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ settings, onUpdate }) =
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative group">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                <span className="text-xs font-black text-slate-400">AED</span>
+                                <span className="text-xs font-black text-slate-400">USD $</span>
                             </div>
                             <input
                                 type="number"
