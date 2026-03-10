@@ -138,6 +138,7 @@ export interface ReconciliationReport {
   };
   created_at?: string;
   is_local?: boolean;
+  user_id?: string;
 }
 
 export interface AppSettings {

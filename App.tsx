@@ -50,6 +50,7 @@ import SystemSettings from './components/SystemSettings.tsx';
 import { subscribeToAuth } from './authService';
 
 const App: React.FC = () => {
+  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const [session, setSession] = useState<UserSession | null>(getSession());
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.DASHBOARD);
   const [internalExpenses, setInternalExpenses] = useState<Expense[]>([]);
@@ -68,13 +69,11 @@ const App: React.FC = () => {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [targetClarifyId, setTargetClarifyId] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>("October");
-  const [selectedYear, setSelectedYear] = useState<number>(2025);
+  const [selectedMonth, setSelectedMonth] = useState<string>(monthsList[new Date().getMonth()]);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [auditBank, setAuditBank] = useState<string>("All Accounts");
   const [evidenceThreshold, setEvidenceThreshold] = useState<number>(10);
   const [targetAuditee, setTargetAuditee] = useState<string>("Self"); // "Self" or employee email
-
-  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   const [appSettings, setAppSettings] = useState<AppSettings>({ audit_threshold: 10, custom_expense_heads: [] }); // Added appSettings state
 
@@ -186,23 +185,43 @@ const App: React.FC = () => {
     console.log(`   - Travel: ${data.travelLogs.length}`);
 
     try {
+      if (!session?.email) {
+        console.error("❌ App: No session email found, cannot save data.");
+        return;
+      }
+
+      // Detect the period of the uploaded data to auto-update filters
+      if (data.expenses.length > 0) {
+        const firstExp = data.expenses[0];
+        if (firstExp.date) {
+          const [y, m] = firstExp.date.split('-');
+          const yearNum = parseInt(y);
+          const monthIdx = parseInt(m) - 1;
+          if (!isNaN(yearNum) && monthsList[monthIdx]) {
+            console.log(`📅 App: Auto-setting period to ${monthsList[monthIdx]} ${yearNum}`);
+            setSelectedMonth(monthsList[monthIdx]);
+            setSelectedYear(yearNum);
+          }
+        }
+      }
+
       if (data.expenses.length > 0) {
         console.log("   - Preparing to save to Firebase...");
-        const expensesToInsert = data.expenses.map(({ id, ...rest }) => ({ ...rest, user_id: session?.email }));
+        const expensesToInsert = data.expenses.map(({ id, ...rest }) => ({ ...rest, user_id: session.email }));
         await addExpenses(expensesToInsert);
       }
       if (data.travelLogs.length > 0) {
         console.log("   - Preparing to save Travel Logs...");
-        const logsToInsert = data.travelLogs.map(({ id, ...rest }) => ({ ...rest, user_id: session?.email }));
+        const logsToInsert = data.travelLogs.map(({ id, ...rest }) => ({ ...rest, user_id: session.email }));
         await addTravelLogs(logsToInsert);
       }
 
       if (data.expenses.some(e => e.needs_clarification)) {
         console.log("   - Clarification needed, switching tab.");
-        setActiveTab(AppTab.RESOLVE); // Changed from AppTab.CLARIFY
-      } else if (data.travelLogs.length > 0) {
-        console.log("   - Travel data found, switching tab.");
-        setActiveTab(AppTab.TRAVEL);
+        setActiveTab(AppTab.RESOLVE);
+      } else {
+        console.log("   - Extraction successful, switching to Dashboard.");
+        setActiveTab(AppTab.DASHBOARD);
       }
       console.log("✅ App: handleAddData complete.");
     } catch (err) {
@@ -383,7 +402,7 @@ const App: React.FC = () => {
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={filteredTravelLogs} expenses={filteredExpenses} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.RESOLVE && <ClarificationCenter expenses={filteredExpenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />} {/* Changed tab name */}
             {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} currentUserEmail={session.email} />} {/* Passed appSettings.audit_threshold and currentUserEmail */}
-            {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} />}
+            {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} session={session} />}
             {activeTab === AppTab.ACCOUNT_MASTER && (
               <AccountMaster
                 expenses={filteredExpenses}
@@ -396,6 +415,7 @@ const App: React.FC = () => {
                 settings={appSettings}
                 customCategories={appSettings.custom_expense_heads}
                 allExpenses={[...internalExpenses, ...telegramExpenses]}
+                session={session}
               />
             )}
             {activeTab === AppTab.SYSTEM_SETTINGS && (

@@ -340,7 +340,7 @@ const Reconciler: React.FC<ReconcilerProps> = ({
         .some(k => merc.includes(k) || cat.includes(k));
 
       // 2. OPTIONAL LOGIC (Dynamic Threshold)
-      const thresholdINR = evidenceThreshold * 22.5; // Approx conversion if rates not available, but ideally we'd use rates
+      const thresholdINR = convertToINR(evidenceThreshold, 'AED', rates);
       const isOptional = ['bank charges', 'transfer', 'vat', 'tax', 'finance', 'charge']
         .some(k => merc.includes(k) || cat.includes(k)) || amountINR < thresholdINR;
 

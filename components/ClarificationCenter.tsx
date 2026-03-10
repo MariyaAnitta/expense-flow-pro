@@ -66,14 +66,20 @@ const ClarificationCenter: React.FC<ClarificationCenterProps> = ({ expenses, onR
     <div className="flex flex-col lg:flex-row gap-10 items-start">
       <div className="w-full lg:w-96 space-y-3">
         <div className="flex items-center justify-between px-2 mb-4">
-           <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Queue ({itemsToClarify.length})</span>
-           <Zap size={14} className="text-amber-500" />
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Queue ({itemsToClarify.length})</span>
+          <Zap size={14} className="text-amber-500" />
         </div>
         <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
           {itemsToClarify.map(item => (
             <button key={item.id} onClick={() => setSelectedId(item.id)} className={`w-full p-6 rounded-[2rem] border text-left transition-all ${selectedId === item.id ? 'bg-white dark:bg-slate-900 border-brand-500 shadow-2xl ring-4 ring-brand-500/5' : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800'}`}>
               <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{item.date}</div>
-              <div className="text-sm font-black dark:text-white uppercase truncate flex items-center gap-2">{item.merchant} {duplicateClusters.some(c => c.some(d => d.id === item.id)) && <AlertTriangle size={12} className="text-amber-500" />}</div>
+              <div className="text-sm font-black dark:text-white uppercase truncate flex items-center gap-2">
+                {item.merchant}
+                {duplicateClusters.some(c => c.some(d => d.id === item.id)) && <AlertTriangle size={12} className="text-amber-500" />}
+                {(item.user_id === 'SHARED_POOL' || (item as any).owner_email === 'SHARED_POOL') && (
+                  <span className="px-1.5 py-0.5 bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 text-[7px] font-black rounded uppercase">Pool</span>
+                )}
+              </div>
             </button>
           ))}
         </div>
@@ -83,41 +89,44 @@ const ClarificationCenter: React.FC<ClarificationCenterProps> = ({ expenses, onR
         {activeItem && (
           <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
             <div className={`p-10 ${activeCluster ? 'bg-amber-50/50 dark:bg-amber-500/5' : 'bg-slate-50/50 dark:bg-slate-800/30'}`}>
-               <div className="flex items-center gap-5 mb-8">
-                  <div className={`${activeCluster ? 'bg-amber-500' : 'bg-brand-600'} p-4 rounded-3xl text-white`}>
-                    {activeCluster ? <AlertTriangle size={32} /> : <HelpCircle size={32} />}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black dark:text-white uppercase tracking-tighter">{activeCluster ? 'Redundant Evidence' : 'Clarification Needed'}</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">{activeItem.clarification_reason || 'Manual Review'}</p>
-                  </div>
-               </div>
+              <div className="flex items-center gap-5 mb-8">
+                <div className={`${activeCluster ? 'bg-amber-500' : 'bg-brand-600'} p-4 rounded-3xl text-white`}>
+                  {activeCluster ? <AlertTriangle size={32} /> : <HelpCircle size={32} />}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black dark:text-white uppercase tracking-tighter">{activeCluster ? 'Redundant Evidence' : 'Clarification Needed'}</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">
+                    {activeItem.clarification_reason || 'Manual Review'}
+                    {(activeItem.user_id === 'SHARED_POOL' || (activeItem as any).owner_email === 'SHARED_POOL') && ' • Shared Pool Entry'}
+                  </p>
+                </div>
+              </div>
 
-               {activeCluster ? (
-                 <div className="space-y-6">
-                    <div className="p-6 bg-amber-50 border border-amber-200 rounded-[2rem] text-amber-800 text-xs font-medium">Duplicate Cluster: Choose the primary record to keep for audit history.</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {activeCluster.map((dupe, i) => (
-                        <div key={dupe.id} className="p-6 bg-white border border-slate-200 rounded-[2rem] shadow-sm flex flex-col justify-between h-full">
-                           <div>
-                             <div className="flex items-center justify-between mb-4">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Entry {i + 1}</span>
-                                <span className="text-[8px] font-black text-slate-400 uppercase">{new Date(dupe.created_at || '').toLocaleTimeString()}</span>
-                             </div>
-                             <div className="text-sm font-black dark:text-white uppercase mb-2">{dupe.merchant}</div>
-                             <div className="text-[10px] text-slate-500 font-bold uppercase mb-4">{dupe.currency} {dupe.amount} • {dupe.date}</div>
-                           </div>
-                           <button onClick={() => handleKeep(dupe.id)} className="w-full py-3 bg-amber-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all">Keep Record {i + 1}</button>
+              {activeCluster ? (
+                <div className="space-y-6">
+                  <div className="p-6 bg-amber-50 border border-amber-200 rounded-[2rem] text-amber-800 text-xs font-medium">Duplicate Cluster: Choose the primary record to keep for audit history.</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {activeCluster.map((dupe, i) => (
+                      <div key={dupe.id} className="p-6 bg-white border border-slate-200 rounded-[2rem] shadow-sm flex flex-col justify-between h-full">
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Entry {i + 1}</span>
+                            <span className="text-[8px] font-black text-slate-400 uppercase">{new Date(dupe.created_at || '').toLocaleTimeString()}</span>
+                          </div>
+                          <div className="text-sm font-black dark:text-white uppercase mb-2">{dupe.merchant}</div>
+                          <div className="text-[10px] text-slate-500 font-bold uppercase mb-4">{dupe.currency} {dupe.amount} • {dupe.date}</div>
                         </div>
-                      ))}
-                    </div>
-                 </div>
-               ) : (
-                 <div className="grid grid-cols-2 gap-8 bg-white dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                    <div><div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Label</div><div className="text-xl font-black dark:text-white uppercase">{activeItem.merchant}</div></div>
-                    <div className="text-right"><div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Value</div><div className="text-3xl font-black dark:text-white">{activeItem.currency} {activeItem.amount}</div></div>
-                 </div>
-               )}
+                        <button onClick={() => handleKeep(dupe.id)} className="w-full py-3 bg-amber-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all">Keep Record {i + 1}</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-8 bg-white dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                  <div><div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Label</div><div className="text-xl font-black dark:text-white uppercase">{activeItem.merchant}</div></div>
+                  <div className="text-right"><div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Value</div><div className="text-3xl font-black dark:text-white">{activeItem.currency} {activeItem.amount}</div></div>
+                </div>
+              )}
             </div>
 
             <div className="p-10 space-y-8">

@@ -55,6 +55,16 @@ export const isHomeLocation = (log: any) => {
   return /uae|emirates|dubai|united arab emirates/.test(dest);
 };
 
+const mapExpenseData = (data: any): Expense => {
+  const sanitized = sanitize(data);
+  return {
+    ...sanitized,
+    category: sanitized.category || sanitized.cat || 'General',
+    confidence: sanitized.confidence === undefined ? 1.0 : sanitized.confidence,
+    needs_clarification: sanitized.needs_clarification || false
+  } as Expense;
+};
+
 
 const calculateDuration = (start: string, end?: string) => {
   const startDate = new Date(start);
@@ -74,8 +84,11 @@ export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {
   const existingLogs = existingLogsSnap.docs.map(d => ({ id: d.id, ...d.data() } as TravelLog));
 
   for (const log of sortedLogs) {
-    // 1. DEDUPLICATION CHECK
+    // 1. DEDUPLICATION CHECK (Per-User)
     const isDuplicate = existingLogs.some(existing => {
+      const sameUser = log.user_id === existing.user_id;
+      if (!sameUser) return false;
+
       if (log.reference_number && existing.reference_number &&
         log.reference_number.toUpperCase() === existing.reference_number.toUpperCase()) return true;
       const sameDate = log.start_date === existing.start_date;
@@ -84,7 +97,10 @@ export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {
       return false;
     });
 
-    if (isDuplicate) continue;
+    if (isDuplicate) {
+      console.log(`⚠️ Firebase: Skipping duplicate Travel Log for user ${log.user_id}: ${log.destination_city} at ${log.start_date}`);
+      continue;
+    }
 
     const isAccommodation = log.travel_type === 'accommodation';
     const isHome = isHomeLocation(log);
@@ -202,7 +218,7 @@ export const subscribeToExpenses = (callback: (expenses: Expense[]) => void) => 
     where('user_id', 'in', [session.email, 'SHARED_POOL'])
   );
   return onSnapshot(q, (snapshot: any) => {
-    callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
+    callback(snapshot.docs.map((doc: any) => mapExpenseData({ id: doc.id, ...doc.data() })));
   });
 };
 
@@ -212,7 +228,7 @@ export const subscribeToAllExpenses = (callback: (expenses: (Expense & { owner_e
   return onSnapshot(q, (snapshot: any) => {
     const expenses = snapshot.docs.map((doc: any) => {
       const data = doc.data();
-      return sanitize({ id: doc.id, ...data, owner_email: data.user_id }) as (Expense & { owner_email?: string });
+      return { ...mapExpenseData({ id: doc.id, ...data }), owner_email: data.user_id } as (Expense & { owner_email?: string });
     });
     callback(expenses);
   });
@@ -249,7 +265,7 @@ export const subscribeToAllTelegramReceipts = (callback: (expenses: (Expense & {
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => {
       const data = doc.data();
-      return sanitize({ id: doc.id, ...data, owner_email: data.user_id }) as (Expense & { owner_email?: string });
+      return { ...mapExpenseData({ id: doc.id, ...data }), owner_email: data.user_id } as (Expense & { owner_email?: string });
     }));
   });
 };
@@ -270,7 +286,7 @@ export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => v
     where('user_id', 'in', [session.email, 'SHARED_POOL'])
   );
   return onSnapshot(q, (snapshot: any) => {
-    callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
+    callback(snapshot.docs.map((doc: any) => mapExpenseData({ id: doc.id, ...doc.data() })));
   });
 };
 
@@ -323,6 +339,7 @@ export const addExpenses = async (expenses: Omit<Expense, 'id'>[]) => {
   const results = [];
   for (const exp of expenses) {
     const isDup = existing.some(e =>
+      e.user_id === exp.user_id && // Per-User Check
       e.merchant.toLowerCase() === exp.merchant.toLowerCase() &&
       Math.abs(e.amount - exp.amount) < 0.01 &&
       e.date === exp.date
@@ -330,6 +347,8 @@ export const addExpenses = async (expenses: Omit<Expense, 'id'>[]) => {
     if (!isDup) {
       const docRef = await addDoc(collection(db, 'expenses'), sanitize({ ...exp, created_at: new Date().toISOString() }));
       results.push({ id: docRef.id, ...exp });
+    } else {
+      console.log(`⚠️ Firebase: Skipping duplicate Expense for user ${exp.user_id}: ${exp.merchant} - ${exp.amount} at ${exp.date}`);
     }
   }
   return results;
@@ -352,14 +371,71 @@ export const saveReportToCloud = async (report: ReconciliationReport) => {
   }));
 };
 
-export const fetchReportsFromCloud = async (year?: number) => {
+export const fetchReportsFromCloud = async (year?: number, email?: string) => {
   const session = getSession();
-  if (!session || !session.isAdmin) return []; // Reports are currently Admin-only in this implementation
+  if (!session) return [];
 
-  const q = year
-    ? query(collection(db, 'reports'), where('year', '==', year))
-    : query(collection(db, 'reports'));
+  let q = query(collection(db, 'reports'));
+
+  if (session.role !== 'admin') {
+    // Employees can only see their own reports
+    q = query(q, where('user_id', '==', session.email));
+  } else if (email && email !== 'All Employees') {
+    // Admin can filter by specific employee
+    q = query(q, where('user_id', '==', email));
+  }
+
+  if (year) {
+    q = query(q, where('year', '==', year));
+  }
 
   const snap = await getDocs(q);
-  return snap.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as ReconciliationReport).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.year, 11, 31).getTime());
+  return snap.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as ReconciliationReport)
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+};
+
+export const subscribeToReports = (callback: (reports: ReconciliationReport[]) => void, year?: number, email?: string) => {
+  const session = getSession();
+  if (!session) {
+    callback([]);
+    return () => { };
+  }
+
+  let q = query(collection(db, 'reports'));
+
+  if (session.role !== 'admin') {
+    // Employees can only see their own reports
+    q = query(q, where('user_id', '==', session.email));
+  } else if (email && email !== 'All Employees') {
+    // Admin can filter by specific employee
+    q = query(q, where('user_id', '==', email));
+  }
+
+  if (year) {
+    q = query(q, where('year', '==', year));
+  }
+
+  return onSnapshot(q, (snapshot: any) => {
+    const reports = snapshot.docs.map((doc: any) => sanitize({
+      id: doc.id,
+      ...doc.data()
+    }) as ReconciliationReport)
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+    callback(reports);
+  }, (error) => {
+    console.error("Reports subscription error:", error);
+    callback([]);
+  });
+};
+export const subscribeToAuthorizedUsers = (callback: (users: string[]) => void) => {
+  const q = query(collection(db, 'authorized_users'));
+  return onSnapshot(q, (snapshot: any) => {
+    const users = snapshot.docs.map((doc: any) => doc.data().email as string).filter(Boolean);
+    const uniqueUsers = Array.from(new Set(users)) as string[];
+    callback(uniqueUsers.sort());
+  });
 };

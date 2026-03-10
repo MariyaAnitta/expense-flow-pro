@@ -1,18 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  History, 
-  Calendar, 
-  ChevronDown, 
-  CheckCircle2, 
-  Loader2, 
-  Cloud, 
-  Database, 
-  ArrowDownToLine, 
-  AlertTriangle, 
-  FileQuestion, 
-  ShieldCheck, 
-  Target, 
+import {
+  History,
+  Calendar,
+  ChevronDown,
+  CheckCircle2,
+  Loader2,
+  Cloud,
+  Database,
+  ArrowDownToLine,
+  AlertTriangle,
+  FileQuestion,
+  ShieldCheck,
+  Target,
   Search,
   Receipt,
   Mail,
@@ -22,35 +22,28 @@ import {
   Info
 } from 'lucide-react';
 import { ReconciliationReport, Expense } from '../types';
-import { getReconciliations } from '../backendService';
+import { subscribeToReports } from '../firebaseService';
 
 interface ReportsProps {
   period: { month: string; year: number };
+  session: any;
 }
 
-const Reports: React.FC<ReportsProps> = ({ period }) => {
+const Reports: React.FC<ReportsProps> = ({ period, session }) => {
   const [reports, setReports] = useState<(ReconciliationReport & { is_local?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(period.year);
 
   useEffect(() => {
-    fetchReports();
-  }, [selectedYear]);
-
-  useEffect(() => { setSelectedYear(period.year); }, [period.year]);
-
-  const fetchReports = async () => {
     setLoading(true);
-    try {
-      const data = await getReconciliations(selectedYear);
-      setReports(data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
+    const unsubscribe = subscribeToReports((data) => {
+      setReports(data);
       setLoading(false);
-    }
-  };
+    }, selectedYear === 0 ? undefined : selectedYear, session?.email);
+
+    return () => unsubscribe();
+  }, [selectedYear, session?.email]);
 
   const handleDownloadCSV = (report: ReconciliationReport) => {
     const headers = ['Type', 'Date', 'Merchant', 'Category', 'Amount', 'Currency', 'Audit_Status'];
@@ -83,7 +76,8 @@ const Reports: React.FC<ReportsProps> = ({ period }) => {
           <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-1">Immutable Compliance Record Storage</p>
         </div>
         <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-6 py-3 rounded-2xl text-[11px] font-black text-slate-700 dark:text-slate-300 outline-none shadow-sm uppercase tracking-widest">
-            {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+          <option value={0}>All Years</option>
+          {Array.from({ length: 12 }, (_, i) => 2015 + i).map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
 
@@ -103,7 +97,7 @@ const Reports: React.FC<ReportsProps> = ({ period }) => {
                 <div className="p-10 cursor-pointer flex flex-col md:flex-row items-center justify-between gap-8" onClick={() => setExpandedReportId(isExpanded ? null : report.id || null)}>
                   <div className="flex items-center gap-8">
                     <div className={`p-6 rounded-[2rem] shadow-sm transition-all ${isExpanded ? 'bg-brand-600 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-300'}`}>
-                        <Calendar size={36} />
+                      <Calendar size={36} />
                     </div>
                     <div>
                       <div className="flex items-center gap-4">
@@ -181,21 +175,43 @@ const Reports: React.FC<ReportsProps> = ({ period }) => {
                       </section>
 
                       {report.mandatory_missing?.length > 0 && (
-                        <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-red-100 dark:border-red-900/40 overflow-hidden">
+                        <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-red-100 dark:border-red-900/40 overflow-hidden shadow-xl">
                           <div className="px-10 py-6 bg-red-600 text-white">
-                            <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Mandatory Proof Required</h4>
+                            <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Mandatory Proof Required (Hard Gaps)</h4>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                            {report.mandatory_missing.map(exp => (
-                              <div key={exp.id} className="px-10 py-8 flex items-center justify-between">
+                            {report.mandatory_missing.map((exp, idx) => (
+                              <div key={idx} className="px-10 py-8 flex items-center justify-between hover:bg-red-50/10 transition-colors">
                                 <div className="flex items-center gap-5">
-                                  <div className="p-4 bg-red-50 dark:bg-red-500/10 rounded-2xl text-red-600"><Target size={20} /></div>
+                                  <div className="p-4 bg-red-50 dark:bg-red-500/10 rounded-2xl text-red-600"><AlertTriangle size={20} /></div>
                                   <div>
                                     <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
-                                    <div className="text-[10px] text-red-600 font-bold uppercase mt-1">{exp.category} • {exp.date}</div>
+                                    <div className="text-[10px] text-red-600 font-black uppercase mt-1 tracking-widest">{exp.category} • {exp.date}</div>
                                   </div>
                                 </div>
                                 <div className="text-right text-sm font-black text-red-700 dark:text-red-400 uppercase">{exp.currency} {exp.amount.toFixed(2)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      )}
+
+                      {report.standard_missing?.length > 0 && (
+                        <section className="bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-amber-100 dark:border-amber-900/40 overflow-hidden shadow-xl">
+                          <div className="px-10 py-6 bg-amber-500 text-white">
+                            <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">General Evidence Missing</h4>
+                          </div>
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                            {report.standard_missing.map((exp, idx) => (
+                              <div key={idx} className="px-10 py-8 flex items-center justify-between hover:bg-amber-50/10 transition-colors">
+                                <div className="flex items-center gap-5">
+                                  <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl text-amber-600"><FileQuestion size={20} /></div>
+                                  <div>
+                                    <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
+                                    <div className="text-[10px] text-amber-600 font-black uppercase mt-1 tracking-widest">{exp.category} • {exp.date}</div>
+                                  </div>
+                                </div>
+                                <div className="text-right text-sm font-black text-amber-700 dark:text-amber-400 uppercase">{exp.currency} {exp.amount.toFixed(2)}</div>
                               </div>
                             ))}
                           </div>

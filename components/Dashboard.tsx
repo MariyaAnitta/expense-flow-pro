@@ -326,7 +326,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 label: 'ALL CATEGORIES',
                 value: filterCategory,
                 setter: setFilterCategory,
-                options: ['All Categories', ...Array.from(new Set(expenses.map(e => e.category)))]
+                options: ['All Categories', ...Array.from(new Set([...expenses.map(e => e.category), ...customCategories]))]
               },
               {
                 label: 'ALL STATUS',
@@ -508,7 +508,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      {session?.role === 'admin' ? (
+                      {((session?.role === 'admin') || (e.user_id === session?.email) || ((e as any).owner_email === session?.email)) ? (
                         <div className="flex flex-col gap-2">
                           <select
                             value={customCategory && editingClassificationId === e.id ? 'Other' : e.category}

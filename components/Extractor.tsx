@@ -352,7 +352,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
         <div className="mt-12">
           <button
             onClick={processContent}
-            disabled={isProcessing || previews.length === 0 || ((activeMode === 'bank_statement' || activeMode === 'credit_card_statement') && !selectedBank)}
+            disabled={isProcessing || previews.length === 0}
             className="w-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 py-6 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] transition-all disabled:opacity-50 flex items-center justify-center gap-5 shadow-2xl active:scale-[0.98]"
           >
             {isProcessing ? <><Loader2 className="animate-spin" size={28} /> Ingesting Data...</> : <><Sparkles size={28} /> Start Batch Extraction <ArrowRight size={28} /></>}
