@@ -171,6 +171,7 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                 <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Classification</th>
                                 <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Value</th>
                                 <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Provenance</th>
+                                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Audit Trail</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -183,7 +184,7 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                             </div>
                                             <div className="overflow-hidden">
                                                 <p className="text-xs font-black truncate max-w-[150px] dark:text-white uppercase tracking-tight">
-                                                    {(expense as any).owner_email || expense.user_id || 'System'}
+                                                    {(expense as any).owner_email === 'SHARED_POOL' || expense.user_id === 'SHARED_POOL' ? 'SHARED POOL' : ((expense as any).owner_email || expense.user_id || 'System')}
                                                 </p>
                                             </div>
                                         </div>
@@ -266,6 +267,20 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                             }`}>
                                             {expense.source.replace(/_/g, ' ')}
                                         </span>
+                                    </td>
+                                    <td className="px-8 py-6">
+                                        {expense.usage_history && expense.usage_history.length > 0 ? (
+                                            <div className="flex flex-col gap-1">
+                                                {expense.usage_history.slice(-1).map((log, i) => (
+                                                    <div key={i} className="text-[9px] font-bold text-slate-500 uppercase">
+                                                        <span className="text-brand-600">USED BY:</span> {log.user.split('@')[0]}
+                                                        <div className="text-[8px] text-slate-400">{new Date(log.date).toLocaleDateString()} {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest italic">No History</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

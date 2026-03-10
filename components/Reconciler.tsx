@@ -40,6 +40,7 @@ interface ReconcilerProps {
   auditBank?: string;
   onBankChange?: (bank: string) => void;
   evidenceThreshold: number;
+  currentUserEmail: string;
 }
 
 const Reconciler: React.FC<ReconcilerProps> = ({
@@ -52,7 +53,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
   saveSuccess,
   auditBank = "All Accounts",
   onBankChange,
-  evidenceThreshold
+  evidenceThreshold,
+  currentUserEmail
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
 
@@ -487,12 +489,44 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                 <tr><td className="p-12 text-center text-slate-400 font-medium italic">Scanning for proof matches in audit pool...</td></tr>
               ) : filteredData.matched.map((pair, idx) => (
                 <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                  <td className="px-12 py-8">
-                    <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px]">
-                      {pair.bank?.merchant}
-                      {pair.bank?.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({pair.bank.bank})</span>}
+                  <td className="px-12 py-8 min-w-[300px]">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-brand-50 dark:bg-brand-900/40 rounded-xl text-brand-600 dark:text-brand-400">
+                        <Database size={18} />
+                      </div>
+                      <div>
+                        <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px]">
+                          {pair.bank?.merchant}
+                          {pair.bank?.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({pair.bank.bank})</span>}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">{pair.bank?.date} • {pair.bank?.category}</div>
+                      </div>
                     </div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">{pair.bank?.date} • {pair.bank?.category}</div>
+                  </td>
+                  <td className="px-12 py-8 min-w-[300px]">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-500">
+                        {pair.receipt?.source === 'telegram' ? <Plus size={18} /> :
+                          pair.receipt?.source === 'forwarded_email' ? <Mail size={18} /> :
+                            <Receipt size={18} />}
+                      </div>
+                      <div>
+                        <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px] flex items-center gap-2">
+                          {pair.receipt?.merchant || 'Auto-Verified'}
+                          {pair.receipt?.user_id === 'SHARED_POOL' && (
+                            <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[8px] px-2 py-0.5 rounded-full font-black">POOL</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                          {pair.receipt?.date}
+                          {pair.receipt?.usage_history && pair.receipt.usage_history.length > 0 && (
+                            <span className="ml-2 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/40 px-2 py-0.5 rounded-md">
+                              Used by {pair.receipt.usage_history[pair.receipt.usage_history.length - 1].user.split('@')[0]}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-12 py-8 text-center">
                     <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border border-emerald-100 dark:border-emerald-500/20">

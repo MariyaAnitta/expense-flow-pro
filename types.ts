@@ -1,5 +1,5 @@
 
-export type ExpenseSource = 'receipt' | 'credit_card_statement' | 'bank_statement' | 'telegram' | 'email' | 'web_upload';
+export type ExpenseSource = 'receipt' | 'credit_card_statement' | 'bank_statement' | 'telegram' | 'email' | 'web_upload' | 'forwarded_email';
 
 export type TravelLogStatus = 'Complete' | 'Open - Awaiting return' | 'Incomplete - Outbound missing';
 
@@ -41,6 +41,11 @@ export interface TravelLog {
   return_flight_id?: string;
   uploaded_at?: string;
   updated_at?: string;
+
+  // Shared Pool Audit
+  usage_history?: UsageLog[];
+  reconciled_by?: string;
+  reconciled_at?: string;
 }
 
 export interface Expense {
@@ -87,6 +92,11 @@ export interface Expense {
   accountant_category?: string;
   is_verified?: boolean;
   verified_amount?: number;
+
+  // Shared Pool Audit
+  usage_history?: UsageLog[];
+  reconciled_by?: string;
+  reconciled_at?: string;
 }
 
 export interface ReconciliationResult {
@@ -145,4 +155,11 @@ export enum AppTab {
   RESOLVE = 'resolve',
   ACCOUNT_MASTER = 'account_master',
   SYSTEM_SETTINGS = 'system_settings'
+}
+
+export interface UsageLog {
+  user: string;
+  date: string;
+  action: string;
+  target_id?: string;
 }

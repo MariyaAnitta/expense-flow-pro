@@ -1,4 +1,4 @@
-import { Expense, ReconciliationReport, TravelLog, AppSettings } from './types';
+import { Expense, ReconciliationReport, TravelLog, AppSettings, UsageLog } from './types';
 import { getSession } from './authService';
 
 import { initializeApp } from 'firebase/app';
@@ -14,7 +14,8 @@ import {
   setDoc,
   getDocs,
   where,
-  Timestamp
+  Timestamp,
+  arrayUnion
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
@@ -196,7 +197,10 @@ export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {
 export const subscribeToExpenses = (callback: (expenses: Expense[]) => void) => {
   const session = getSession();
   if (!session) return () => { };
-  const q = query(collection(db, 'expenses'), where('user_id', '==', session.email));
+  const q = query(
+    collection(db, 'expenses'),
+    where('user_id', 'in', [session.email, 'SHARED_POOL'])
+  );
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
   });
@@ -261,7 +265,10 @@ export const verifyExpense = async (id: string, updates: { accountant_category: 
 export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => void) => {
   const session = getSession();
   if (!session) return () => { };
-  const q = query(collection(db, 'telegram_receipts'), where('user_id', '==', session.email));
+  const q = query(
+    collection(db, 'telegram_receipts'),
+    where('user_id', 'in', [session.email, 'SHARED_POOL'])
+  );
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as Expense));
   });
@@ -270,10 +277,41 @@ export const subscribeToTelegramReceipts = (callback: (expenses: Expense[]) => v
 export const subscribeToTravelLogs = (callback: (logs: TravelLog[]) => void) => {
   const session = getSession();
   if (!session) return () => { };
-  const q = query(collection(db, 'travel_logs'), where('user_id', '==', session.email));
+  const q = query(
+    collection(db, 'travel_logs'),
+    where('user_id', 'in', [session.email, 'SHARED_POOL'])
+  );
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => sanitize({ id: doc.id, ...doc.data() }) as TravelLog));
   });
+};
+
+export const logReceiptUsage = async (id: string, userEmail: string, action: string = 'Reconciled') => {
+  const receiptRef = doc(db, 'expenses', id);
+  const log: UsageLog = {
+    user: userEmail,
+    date: new Date().toISOString(),
+    action: action
+  };
+
+  return await setDoc(receiptRef, {
+    usage_history: arrayUnion(log),
+    reconciled_by: userEmail,
+    reconciled_at: new Date().toISOString()
+  }, { merge: true });
+};
+
+export const logTravelUsage = async (id: string, userEmail: string, action: string = 'Viewed') => {
+  const logRef = doc(db, 'travel_logs', id);
+  const log: UsageLog = {
+    user: userEmail,
+    date: new Date().toISOString(),
+    action: action
+  };
+
+  return await setDoc(logRef, {
+    usage_history: arrayUnion(log)
+  }, { merge: true });
 };
 
 export const addExpenses = async (expenses: Omit<Expense, 'id'>[]) => {

@@ -33,7 +33,8 @@ import {
   subscribeToAllTelegramReceipts,
   subscribeToAllTravelLogs,
   subscribeToSettings, // Added
-  updateSettings // Added
+  updateSettings, // Added
+  logReceiptUsage // Added
 } from './firebaseService';
 import { getSession, signOut, UserSession } from './authService';
 import { saveReconciliation } from './backendService';
@@ -146,7 +147,7 @@ const App: React.FC = () => {
     return combined
       .filter(e => {
         const uId = (e as any).user_id || (e as any).owner_email;
-        const userMatch = !auditeeEmail || auditeeEmail === "All Employees" || uId === auditeeEmail;
+        const userMatch = !auditeeEmail || auditeeEmail === "All Employees" || uId === auditeeEmail || uId === 'SHARED_POOL';
 
         // Month/Year filter for non-dashboard views if needed,
         // but user specifically mentioned sorting by year/month in Account Master
@@ -158,7 +159,7 @@ const App: React.FC = () => {
   const filteredTravelLogs = useMemo(() => {
     return travelLogs.filter(l => {
       const uId = (l as any).user_id || (l as any).owner_email;
-      const matchesUser = !currentUserEmail || uId === currentUserEmail;
+      const matchesUser = !currentUserEmail || uId === currentUserEmail || uId === 'SHARED_POOL';
 
       if (!l.start_date) return matchesUser;
 
@@ -214,6 +215,15 @@ const App: React.FC = () => {
     setSaveSuccess(false);
     try {
       await saveReconciliation(report);
+
+      // Audit Trail Implementation: Log usage for all receipts matched in this period
+      const matchedReceipts = report.matched_transactions.filter(e => e.source !== 'bank_statement' && e.source !== 'credit_card_statement');
+      for (const receipt of matchedReceipts) {
+        if (receipt.id) {
+          await logReceiptUsage(receipt.id, session?.email || 'unknown', 'Matched during Audit');
+        }
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
@@ -372,7 +382,7 @@ const App: React.FC = () => {
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={filteredTravelLogs} expenses={filteredExpenses} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.RESOLVE && <ClarificationCenter expenses={filteredExpenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />} {/* Changed tab name */}
-            {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} />} {/* Passed appSettings.audit_threshold */}
+            {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} currentUserEmail={session.email} />} {/* Passed appSettings.audit_threshold and currentUserEmail */}
             {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.ACCOUNT_MASTER && (
               <AccountMaster
