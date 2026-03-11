@@ -509,7 +509,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      {((session?.role === 'admin') || (e.user_id === session?.email) || ((e as any).owner_email === session?.email)) ? (
+                      {((session?.role === 'admin') || (e.user_id === session?.email) || ((e as any).owner_email === session?.email) || (e.user_id === 'SHARED_POOL')) ? (
                         <div className="flex flex-col gap-2">
                           <select
                             value={customCategory && editingClassificationId === e.id ? 'Other' : e.category}
