@@ -24,7 +24,8 @@ import {
   Plus,
   ChevronRight,
   ShieldCheck as AuditShield,
-  Calendar as AuditCalendar
+  Calendar as AuditCalendar,
+  MessageCircle
 } from 'lucide-react';
 import { getExchangeRates, convertToUSD, ExchangeRates } from '../currencyService';
 import jsPDF from 'jspdf';
@@ -512,7 +513,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                       <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-500">
                         {pair.receipt?.source === 'telegram' ? <Plus size={18} /> :
                           pair.receipt?.source === 'forwarded_email' ? <Mail size={18} /> :
-                            <Receipt size={18} />}
+                            pair.receipt?.source === 'whatsapp' ? <MessageCircle size={18} className="text-emerald-500" /> :
+                              <Receipt size={18} />}
                       </div>
                       <div>
                         <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px] flex items-center gap-2">

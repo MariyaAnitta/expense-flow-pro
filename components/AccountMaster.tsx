@@ -28,7 +28,12 @@ import {
     History,
     FileText,
     FileQuestion,
-    ShieldCheck
+    ShieldCheck,
+    Send,
+    Mail,
+    Database,
+    CreditCard,
+    MessageCircle
 } from 'lucide-react';
 import TravelTracker from './TravelTracker';
 
@@ -318,12 +323,34 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                             <span className="text-sm font-black dark:text-white uppercase tracking-tight">{expense.amount.toFixed(2)}</span>
                                         </td>
                                         <td className="px-8 py-6">
-                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${expense.source.includes('statement')
-                                                ? 'bg-sky-50 text-sky-600 border border-sky-100'
-                                                : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
-                                                }`}>
-                                                {expense.source.replace(/_/g, ' ')}
-                                            </span>
+                                            {(() => {
+                                                const src = expense.source || '';
+                                                const label = src === 'bank_statement' ? 'BANK STATEMENT'
+                                                    : src === 'credit_card_statement' ? 'CREDIT CARD'
+                                                        : src === 'telegram' ? 'TELEGRAM BOT'
+                                                            : src === 'whatsapp' ? 'WHATSAPP BOT'
+                                                                : src === 'email' ? 'EMAIL'
+                                                                    : src === 'forwarded_email' ? 'FORWARDED EMAIL'
+                                                                        : src === 'web_upload' ? 'WEB UPLOAD'
+                                                                            : src.replace(/_/g, ' ').toUpperCase();
+                                                const isBot = src === 'telegram' || src === 'whatsapp';
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        {src === 'telegram' && <Send size={13} className="text-sky-500" />}
+                                                        {src === 'whatsapp' && <MessageCircle size={13} className="text-emerald-500" />}
+                                                        {src === 'bank_statement' && <Database size={13} className="text-amber-500" />}
+                                                        {src === 'credit_card_statement' && <CreditCard size={13} className="text-indigo-500" />}
+                                                        {src === 'email' && <Mail size={13} className="text-pink-500" />}
+                                                        {src === 'forwarded_email' && <Mail size={13} className="text-pink-500" />}
+                                                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${isBot ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                                                : src.includes('statement') ? 'bg-sky-50 text-sky-600 border border-sky-100'
+                                                                    : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                                            }`}>
+                                                            {label}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-8 py-6">
                                             {(() => {

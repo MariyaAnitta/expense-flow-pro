@@ -1,5 +1,4 @@
-
-export type ExpenseSource = 'receipt' | 'credit_card_statement' | 'bank_statement' | 'telegram' | 'email' | 'web_upload' | 'forwarded_email';
+export type ExpenseSource = 'receipt' | 'credit_card_statement' | 'bank_statement' | 'telegram' | 'whatsapp' | 'email' | 'web_upload' | 'forwarded_email';
 
 export type TravelLogStatus = 'Complete' | 'Open - Awaiting return' | 'Incomplete - Outbound missing';
 

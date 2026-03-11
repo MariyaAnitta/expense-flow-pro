@@ -22,7 +22,8 @@ import {
   ChevronDown,
   Lock,
   Edit3,
-  Check
+  Check,
+  MessageCircle
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
 import { UserSession } from '../authService';
@@ -157,6 +158,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         (filterSource === "Bank Statement" && e.source === "bank_statement") ||
         (filterSource === "Credit Card Statement" && e.source === "credit_card_statement") ||
         (filterSource === "Telegram Bot" && e.source === "telegram") ||
+        (filterSource === "WhatsApp Bot" && e.source === "whatsapp") ||
         (filterSource === "Email Alert" && e.source === "email");
       if (!matchesSource) return false;
 
@@ -203,6 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       case 'bank_statement': return <Database size={18} className="text-amber-500" />;
       case 'telegram': return <Send size={18} className="text-sky-500" />;
       case 'email': return <Mail size={18} className="text-pink-500" />;
+      case 'whatsapp': return <MessageCircle size={18} className="text-emerald-500" />;
       default: return <Search size={18} />;
     }
   };
@@ -458,8 +461,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                           )}
                         </div>
 
-                        {/* Telegram Bot Specific Data View */}
-                        {e.source === 'telegram' ? (
+                        {/* Telegram/WhatsApp Bot Specific Data View */}
+                        {(e.source === 'telegram' || e.source === 'whatsapp') ? (
                           <div className="text-[11px] text-slate-400 font-medium italic space-y-0.5">
                             <div>Category: {e.main_category || 'Personal'}</div>
                             {e.main_category === 'Business' && (
