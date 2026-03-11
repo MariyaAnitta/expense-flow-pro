@@ -269,14 +269,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="bg-white dark:bg-[#0b1120] p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-40">
           <div className="flex justify-between items-start mb-2">
-            <div className="w-10 h-10 bg-sky-50 dark:bg-sky-500/10 rounded-2xl flex items-center justify-center text-sky-500"><Send size={20} /></div>
+            <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500"><MessageCircle size={20} /></div>
             <div className="text-right">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mobile Bot</p>
-              <h4 className="text-3xl font-black tracking-tighter">{stats.sources.telegram || 0}</h4>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mobile Bots</p>
+              <h4 className="text-3xl font-black tracking-tighter">{(stats.sources.telegram || 0) + (stats.sources.whatsapp || 0)}</h4>
             </div>
           </div>
           <div className="mt-auto w-full h-1 bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-sky-500" style={{ width: `${Math.min(100, (stats.sources.telegram || 0) / (stats.count || 1) * 100)}%` }}></div>
+            <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, ((stats.sources.telegram || 0) + (stats.sources.whatsapp || 0)) / (stats.count || 1) * 100)}%` }}></div>
           </div>
         </div>
 
@@ -342,7 +342,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 label: 'ALL SOURCES',
                 value: filterSource,
                 setter: setFilterSource,
-                options: ['All Sources', 'Receipt', 'Web Document', 'Bank Statement', 'Credit Card Statement', 'Telegram Bot', 'Email Alert']
+                options: ['All Sources', 'Receipt', 'Web Document', 'Bank Statement', 'Credit Card Statement', 'Telegram Bot', 'WhatsApp Bot', 'Email Alert']
               },
               {
                 label: 'ALL BANKS',
@@ -587,18 +587,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-3">
                         <div className={`p-2.5 rounded-xl ${e.source === 'telegram' ? 'bg-sky-50 dark:bg-sky-500/10' :
-                          e.source === 'email' ? 'bg-pink-50 dark:bg-pink-500/10' :
-                            e.source === 'web_upload' ? 'bg-brand-50 dark:bg-brand-500/10' :
-                              'bg-slate-50 dark:bg-slate-800'
+                          e.source === 'whatsapp' ? 'bg-emerald-50 dark:bg-emerald-500/10' :
+                            e.source === 'email' ? 'bg-pink-50 dark:bg-pink-500/10' :
+                              e.source === 'web_upload' ? 'bg-brand-50 dark:bg-brand-500/10' :
+                                'bg-slate-50 dark:bg-slate-800'
                           }`}>
                           <SourceIcon source={e.source} />
                         </div>
                         <span className={`text-[10px] font-black uppercase tracking-widest ${e.source === 'telegram' ? 'text-sky-600' :
-                          e.source === 'email' ? 'text-pink-600' :
-                            e.source === 'web_upload' ? 'text-brand-600' :
-                              'text-slate-400'
+                          e.source === 'whatsapp' ? 'text-emerald-600' :
+                            e.source === 'email' ? 'text-pink-600' :
+                              e.source === 'web_upload' ? 'text-brand-600' :
+                                'text-slate-400'
                           }`}>
-                          {e.source === 'telegram' ? 'Telegram Bot' : e.source === 'email' ? 'Email Alert' : e.source === 'web_upload' ? 'Web Document' : e.source.replace('_', ' ')}
+                          {e.source === 'telegram' ? 'Telegram Bot' : e.source === 'whatsapp' ? 'WhatsApp Bot' : e.source === 'email' ? 'Email Alert' : e.source === 'web_upload' ? 'Web Document' : e.source.replace('_', ' ')}
                         </span>
                       </div>
                     </td>
