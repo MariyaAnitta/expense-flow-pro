@@ -177,8 +177,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [expenses, period, selectedTypeFilter, searchQuery, filterCategory, filterStatus, filterSource, filterBank]);
 
   const stats = useMemo(() => {
-    const rates = exchangeData?.rates || {};
-    const totalUSD = filteredExpenses.reduce((acc, curr) => acc + convertToUSD(curr.amount, curr.currency, rates), 0);
+    const rates = exchangeData || {};
+    const totalUSD = filteredExpenses.reduce((acc, curr) => acc + convertToUSD(curr.amount, curr.currency, rates, curr.date), 0);
     const count = filteredExpenses.length;
     const sources = filteredExpenses.reduce((acc: any, curr) => {
       acc[curr.source] = (acc[curr.source] || 0) + 1;
@@ -578,7 +578,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <span className="text-sm font-black text-slate-900 dark:text-white">{e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         {e.currency !== 'USD' && (
                           <span className="text-[10px] font-black text-brand-600 dark:text-brand-400 uppercase tracking-widest mt-0.5">
-                            ≈ ${convertToUSD(e.amount, e.currency, exchangeData?.rates || {}).toFixed(2)}
+                            ≈ ${convertToUSD(e.amount, e.currency, exchangeData || {}, e.date).toFixed(2)}
                           </span>
                         )}
                         <span className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest mt-0.5">Gross Value</span>

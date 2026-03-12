@@ -244,8 +244,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       const rDate = new Date(receipt.date).getTime();
       const diffDays = Math.abs(bDate - rDate) / (1000 * 60 * 60 * 24);
 
-      const bUSD = convertToUSD(bank.amount, bank.currency, rates);
-      const rUSD = convertToUSD(receipt.amount, receipt.currency, rates);
+      const bUSD = convertToUSD(bank.amount, bank.currency, rates, bank.date);
+      const rUSD = convertToUSD(receipt.amount, receipt.currency, rates, receipt.date);
 
       // FOR CROSS-CURRENCY: Allow 5% margin if AI suggested it
       const sameCurrency = bank.currency === receipt.currency;
@@ -281,8 +281,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
     unmatchedAnchors.forEach(bankTx => {
       // Find a forensic match: same amount + 3-day window + fuzzy merchant
       const autoMatch = availableReceipts.find(rec => {
-        const bUSD = convertToUSD(bankTx.amount, bankTx.currency, rates);
-        const rUSD = convertToUSD(rec.amount, rec.currency, rates);
+        const bUSD = convertToUSD(bankTx.amount, bankTx.currency, rates, bankTx.date);
+        const rUSD = convertToUSD(rec.amount, rec.currency, rates, rec.date);
 
         // Date Clearance Window Logic
         const bDate = new Date(bankTx.date).getTime();
