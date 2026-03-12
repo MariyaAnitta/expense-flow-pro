@@ -588,7 +588,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <div className="flex items-center gap-3">
                         <div className={`p-2.5 rounded-xl ${e.source === 'telegram' ? 'bg-sky-50 dark:bg-sky-500/10' :
                           e.source === 'whatsapp' ? 'bg-emerald-50 dark:bg-emerald-500/10' :
-                            e.source === 'email' ? 'bg-pink-50 dark:bg-pink-500/10' :
+                            (e.source === 'email' || e.source === 'forwarded_email') ? 'bg-pink-50 dark:bg-pink-500/10' :
                               e.source === 'web_upload' ? 'bg-brand-50 dark:bg-brand-500/10' :
                                 'bg-slate-50 dark:bg-slate-800'
                           }`}>
@@ -596,11 +596,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <span className={`text-[10px] font-black uppercase tracking-widest ${e.source === 'telegram' ? 'text-sky-600' :
                           e.source === 'whatsapp' ? 'text-emerald-600' :
-                            e.source === 'email' ? 'text-pink-600' :
+                            (e.source === 'email' || e.source === 'forwarded_email') ? 'text-pink-600' :
                               e.source === 'web_upload' ? 'text-brand-600' :
                                 'text-slate-400'
                           }`}>
-                          {e.source === 'telegram' ? 'Telegram Bot' : e.source === 'whatsapp' ? 'WhatsApp Bot' : e.source === 'email' ? 'Email Alert' : e.source === 'web_upload' ? 'Web Document' : e.source.replace('_', ' ')}
+                          {e.source === 'telegram' ? 'Telegram Bot' : e.source === 'whatsapp' ? 'WhatsApp Bot' : e.source === 'email' ? 'Email Alert' : e.source === 'forwarded_email' ? 'Forwarded Email' : e.source === 'web_upload' ? 'Web Document' : e.source.replace('_', ' ')}
                         </span>
                       </div>
                     </td>

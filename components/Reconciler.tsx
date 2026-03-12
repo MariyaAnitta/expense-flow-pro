@@ -343,8 +343,10 @@ const Reconciler: React.FC<ReconcilerProps> = ({
         .some(k => merc.includes(k) || cat.includes(k));
 
       // 2. OPTIONAL LOGIC (Dynamic Threshold in USD)
-      const isOptional = ['bank charges', 'transfer', 'vat', 'tax', 'finance', 'charge']
-        .some(k => merc.includes(k) || cat.includes(k)) || amountUSD < evidenceThreshold;
+      // Use exact word boundaries for sensitive words like 'tax' so it doesn't match 'taxi'
+      const hasOptionalKeywords = ['bank charges', 'transfer', 'vat', 'finance', 'charge'].some(k => merc.includes(k) || cat.includes(k)) ||
+        /\btax\b/.test(merc) || /\btax\b/.test(cat);
+      const isOptional = hasOptionalKeywords || amountUSD < evidenceThreshold;
 
       if (isMandatory) mandatoryMissing.push(exp);
       else if (isOptional) optionalMissing.push(exp);
