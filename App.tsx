@@ -325,6 +325,36 @@ const App: React.FC = () => {
 
   if (!session) return <Auth onAuthenticated={(sess) => setSession(sess)} />;
 
+  if (session.role === 'pending') {
+    return (
+      <div className="h-screen w-screen bg-slate-50 dark:bg-[#020617] flex items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-white dark:bg-[#0b1120] rounded-[3.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-12 text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-400 to-brand-600" />
+          <div className="w-24 h-24 bg-brand-50 dark:bg-brand-900/30 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-brand-600 dark:text-brand-400 rotate-3">
+            <ShieldCheck size={48} />
+          </div>
+          <h1 className="text-3xl font-black tracking-tighter dark:text-white uppercase mb-4">Account Pending</h1>
+          <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-10">
+            Welcome to <span className="text-brand-600 font-black">ExpenseFlow</span>.<br />
+            Your account <span className="text-slate-900 dark:text-white font-bold">({session.email})</span> is currently waiting for administrator approval.
+          </p>
+          <div className="flex flex-col gap-4">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-400">
+              Action Required: Contact your Admin
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all active:scale-95"
+            >
+              <LogOut size={18} />
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const clarificationCount = filteredExpenses.filter(e => (!e.category || e.category === 'Unknown' || (e.confidence || 0) < 0.7 || e.needs_clarification)).length;
 
   const NavItem = ({ tab, icon: Icon, label, count }: { tab: AppTab, icon: any, label: string, count?: number }) => (

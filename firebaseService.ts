@@ -439,3 +439,17 @@ export const subscribeToAuthorizedUsers = (callback: (users: string[]) => void) 
     callback(uniqueUsers.sort());
   });
 };
+
+export const subscribeToFullUserList = (callback: (users: any[]) => void) => {
+  const q = query(collection(db, 'authorized_users'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot: any) => {
+    callback(snapshot.docs.map((doc: any) => ({
+      uid: doc.id,
+      ...doc.data()
+    })));
+  });
+};
+
+export const updateUserRole = async (uid: string, role: 'admin' | 'employee' | 'pending') => {
+  return await setDoc(doc(db, 'authorized_users', uid), { role, updated_at: new Date().toISOString() }, { merge: true });
+};

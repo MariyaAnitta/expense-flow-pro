@@ -14,7 +14,7 @@ export interface UserSession {
   email: string;
   loginTime: number;
   isAdmin?: boolean;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'employee' | 'pending';
 }
 
 export const signUp = async (email: string, password: string, _recoveryPhrase?: string): Promise<UserSession> => {
@@ -24,7 +24,7 @@ export const signUp = async (email: string, password: string, _recoveryPhrase?: 
   // Create Firestore user profile
   await setDoc(doc(db, 'authorized_users', user.uid), {
     email: user.email,
-    role: 'employee',
+    role: 'pending',
     createdAt: new Date().toISOString()
   });
 
@@ -33,7 +33,7 @@ export const signUp = async (email: string, password: string, _recoveryPhrase?: 
     email: user.email || '',
     loginTime: Date.now(),
     isAdmin: false,
-    role: 'employee' as const
+    role: 'pending' as const
   };
   localStorage.setItem('expenseflow_session', JSON.stringify(session));
   return session;
