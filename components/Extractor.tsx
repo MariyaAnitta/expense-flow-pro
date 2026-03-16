@@ -148,9 +148,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
       return {
         content: extractionInput,
         source: activeMode === 'receipt' ? 'web_upload' : activeMode,
-        bank: (activeMode === 'bank_statement' || activeMode === 'credit_card_statement')
-          ? (selectedBank === 'Other' ? customBankName : selectedBank)
-          : ''
+        bank: (selectedBank === 'Other' ? customBankName : selectedBank)
       };
     });
 
@@ -179,10 +177,14 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
         // --- AUTO-PILOT MAPPING LOGIC ---
         const mappedExpenses = res.expenses.map(exp => {
           if (exp.card_digits) {
-            const match = bankMappings.find(m => m.card_digits === exp.card_digits);
+            const cleanDigits = exp.card_digits.replace(/\D/g, '').slice(-4);
+            const match = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === cleanDigits);
+
             if (match) {
-              console.log(`[Auto-Pilot] Mapped card ${exp.card_digits} to ${match.bank_name}`);
-              return { ...exp, bank: match.bank_name };
+              console.log(`[Auto-Pilot] SUCCESS: Mapped card ${cleanDigits} to ${match.bank_name}`);
+              return { ...exp, bank: match.bank_name, card_digits: cleanDigits };
+            } else {
+              console.log(`[Auto-Pilot] NO MATCH in registry for card digits: ${cleanDigits}`);
             }
           }
           return exp;

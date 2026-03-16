@@ -155,15 +155,37 @@ const BankRegistry: React.FC<BankRegistryProps> = ({ mappings }) => {
                                     <select
                                         required
                                         className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
-                                        value={newMapping.bank_name}
-                                        onChange={(e) => setNewMapping({ ...newMapping, bank_name: e.target.value })}
+                                        value={["Amex", "Citi", "HSBC", "Standard Chartered", ""].includes(newMapping.bank_name) ? newMapping.bank_name : 'Other'}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === 'Other') {
+                                                setNewMapping({ ...newMapping, bank_name: '' });
+                                            } else {
+                                                setNewMapping({ ...newMapping, bank_name: val });
+                                            }
+                                        }}
                                     >
                                         <option value="">Select Bank</option>
-                                        {["Amex", "Citi", "HSBC", "Standard Chartered", "Other"].map(b => (
+                                        {["Amex", "Citi", "HSBC", "Standard Chartered"].map(b => (
                                             <option key={b} value={b}>{b}</option>
                                         ))}
+                                        <option value="Other">Other (Type Name...)</option>
                                     </select>
                                 </div>
+
+                                {(newMapping.bank_name !== '' && !["Amex", "Citi", "HSBC", "Standard Chartered"].includes(newMapping.bank_name)) && (
+                                    <div className="animate-in slide-in-from-top-2 duration-200">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1 text-brand-500">Specify Bank Name</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="e.g. Emirates NBD"
+                                            className="w-full bg-slate-50 dark:bg-slate-800/50 border border-brand-200 dark:border-brand-900 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
+                                            value={newMapping.bank_name}
+                                            onChange={(e) => setNewMapping({ ...newMapping, bank_name: e.target.value })}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-5 rounded-2xl mt-8 flex gap-3">
