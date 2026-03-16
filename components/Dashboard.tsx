@@ -165,7 +165,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (!matchesSource) return false;
 
       // 6. Bank Filter
-      const matchesBank = filterBank === "All Accounts" || e.bank === filterBank;
+      const reactiveBank = e.bank || (e.card_digits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === e.card_digits.replace(/\D/g, '').slice(-4))?.bank_name : "");
+      const matchesBank = filterBank === "All Accounts" || reactiveBank === filterBank;
       if (!matchesBank) return false;
 
       // 7. Legacy Type Filter (if still needed)
@@ -449,10 +450,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                               {e.merchant}
                               {session?.role === 'admin' && <Edit3 size={10} className="inline ml-2 opacity-0 group-hover:opacity-40" />}
                               {(() => {
-                                const displayedBank = e.bank || (e.card_digits ? bankMappings.find(m => m.card_digits === e.card_digits)?.bank_name : "");
-                                return displayedBank ? (
-                                  <span className="ml-2 text-[11px] text-brand-600 font-bold uppercase tracking-tight">({displayedBank})</span>
-                                ) : null;
+                                if (!e.card_digits && !e.bank) return null;
+
+                                // Priority 1: Bank already in record
+                                if (e.bank) return <span className="ml-2 text-[11px] text-brand-600 font-bold uppercase tracking-tight">({e.bank})</span>;
+
+                                // Priority 2: Reactive lookup if digits exist
+                                if (e.card_digits) {
+                                  const cleanE = e.card_digits.replace(/\D/g, '').slice(-4);
+                                  const match = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === cleanE);
+                                  if (match) {
+                                    return <span className="ml-2 text-[11px] text-brand-600 font-bold uppercase tracking-tight">({match.bank_name})</span>;
+                                  }
+                                }
+                                return null;
                               })()}
                             </span>
                           )}
