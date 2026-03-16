@@ -453,3 +453,30 @@ export const subscribeToFullUserList = (callback: (users: any[]) => void) => {
 export const updateUserRole = async (uid: string, role: 'admin' | 'employee' | 'pending') => {
   return await setDoc(doc(db, 'authorized_users', uid), { role, updated_at: new Date().toISOString() }, { merge: true });
 };
+
+// --- BANK REGISTRY METHODS ---
+export const subscribeToBankRegistry = (callback: (mappings: any[]) => void) => {
+  const session = getSession();
+  if (!session) return () => { };
+  const q = query(
+    collection(db, 'bank_registry'),
+    where('user_id', '==', session.email)
+  );
+  return onSnapshot(q, (snapshot: any) => {
+    callback(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+  });
+};
+
+export const saveBankMapping = async (mapping: { card_digits: string, bank_name: string }) => {
+  const session = getSession();
+  if (!session) throw new Error("No session");
+  return await addDoc(collection(db, 'bank_registry'), {
+    ...mapping,
+    user_id: session.email,
+    created_at: new Date().toISOString()
+  });
+};
+
+export const deleteBankMapping = async (id: string) => {
+  return await deleteDoc(doc(db, 'bank_registry', id));
+};

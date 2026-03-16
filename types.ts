@@ -96,6 +96,7 @@ export interface Expense {
   usage_history?: UsageLog[];
   reconciled_by?: string;
   reconciled_at?: string;
+  card_digits?: string; // Extracted last 4 digits
 }
 
 export interface ReconciliationResult {
@@ -147,6 +148,14 @@ export interface AppSettings {
   updated_at?: string;
 }
 
+export interface BankMapping {
+  id: string;
+  user_id: string;
+  card_digits: string;
+  bank_name: string;
+  created_at?: string;
+}
+
 export enum AppTab {
   DASHBOARD = 'dashboard',
   EXTRACT = 'extract',
@@ -155,7 +164,8 @@ export enum AppTab {
   REPORTS = 'reports',
   RESOLVE = 'resolve',
   ACCOUNT_MASTER = 'account_master',
-  SYSTEM_SETTINGS = 'system_settings'
+  SYSTEM_SETTINGS = 'system_settings',
+  BANK_REGISTRY = 'bank_registry'
 }
 
 export interface UsageLog {

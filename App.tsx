@@ -17,7 +17,8 @@ import {
   Minimize,
   Plane, // Used for Travel Tracker
   History, // Changed from Archive for Data Archive
-  Settings // Used for System Settings
+  Settings, // Used for System Settings
+  CreditCard // Used for Bank Registry
 } from 'lucide-react';
 import { Expense, AppTab, ReconciliationResult, ReconciliationReport, TravelLog, AppSettings } from './types'; // Added AppSettings
 import { reconcileData } from './geminiService';
@@ -34,7 +35,8 @@ import {
   subscribeToAllTravelLogs,
   subscribeToSettings, // Added
   updateSettings, // Added
-  logReceiptUsage // Added
+  logReceiptUsage, // Added
+  subscribeToBankRegistry // Added
 } from './firebaseService';
 import { getSession, signOut, UserSession } from './authService';
 import { saveReconciliation } from './backendService';
@@ -45,8 +47,9 @@ import Reports from './components/Reports';
 import Auth from './components/Auth';
 import ClarificationCenter from './components/ClarificationCenter';
 import TravelTracker from './components/TravelTracker';
-import AccountMaster from './components/AccountMaster.tsx';
-import SystemSettings from './components/SystemSettings.tsx';
+import AccountMaster from './components/AccountMaster';
+import SystemSettings from './components/SystemSettings';
+import BankRegistry from './components/BankRegistry';
 import { subscribeToAuth } from './authService';
 
 const App: React.FC = () => {
@@ -76,6 +79,7 @@ const App: React.FC = () => {
   const [targetAuditee, setTargetAuditee] = useState<string>("Self"); // "Self" or employee email
 
   const [appSettings, setAppSettings] = useState<AppSettings>({ audit_threshold: 10, custom_expense_heads: [] }); // Added appSettings state
+  const [bankMappings, setBankMappings] = useState<any[]>([]); // Added bankRegistry state
 
   useEffect(() => {
     if (darkMode) { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); }
@@ -104,6 +108,12 @@ const App: React.FC = () => {
     const unsub = subscribeToSettings(setAppSettings); // Subscribing to settings
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    const unsub = subscribeToBankRegistry(setBankMappings);
+    return () => unsub();
+  }, [session]);
 
   useEffect(() => {
     if (!session) return;
@@ -391,6 +401,7 @@ const App: React.FC = () => {
                   <div className="mt-8 mb-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] opacity-50">Administration</div>
                   <NavItem tab={AppTab.ACCOUNT_MASTER} icon={ShieldCheck} label="Account Master" /> {/* Changed tab name */}
                   <NavItem tab={AppTab.SYSTEM_SETTINGS} icon={Settings} label="System Settings" /> {/* Added */}
+                  <NavItem tab={AppTab.BANK_REGISTRY} icon={CreditCard} label="Bank Registry" /> {/* Added */}
                 </>
               )}
             </div>
@@ -429,7 +440,7 @@ const App: React.FC = () => {
         <section className="flex-1 overflow-y-auto p-6 bg-[#f8fafc] dark:bg-[#020617]">
           <div className="max-w-screen-xl mx-auto">
             {activeTab === AppTab.DASHBOARD && <Dashboard expenses={filteredExpenses} onDelete={removeExpense} onUpdate={updateExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={setTargetClarifyId} filterBank={auditBank} onFilterBankChange={setAuditBank} session={session} customCategories={appSettings.custom_expense_heads} />}
-            {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} />}
+            {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} bankMappings={bankMappings} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={filteredTravelLogs} expenses={filteredExpenses} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.RESOLVE && <ClarificationCenter expenses={filteredExpenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />} {/* Changed tab name */}
             {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} currentUserEmail={session.email} />} {/* Passed appSettings.audit_threshold and currentUserEmail */}
@@ -455,6 +466,7 @@ const App: React.FC = () => {
                 onUpdate={updateSettings}
               />
             )}
+            {activeTab === AppTab.BANK_REGISTRY && <BankRegistry mappings={bankMappings} />}
           </div>
         </section>
       </main>

@@ -71,6 +71,7 @@ export const batchExtractAllData = async (
         reimbursement_status: item.reimbursement_status,
         paid_by: item.paid_by,
         payment_method: item.payment_method,
+        card_digits: item.cd || "",
         notes: item.notes
       }));
 

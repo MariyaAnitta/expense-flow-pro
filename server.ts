@@ -146,6 +146,7 @@ const ExpenseRecordSchema = z.object({
     reimbursement_status: z.string().optional().describe("Status for company payout"),
     paid_by: z.string().optional().describe("Who paid (Employee vs Company)"),
     payment_method: z.string().optional().describe("Payment type (Card, Cash)"),
+    cd: z.string().optional().describe("Last 4 digits of the payment card if visible on the receipt"),
     notes: z.string().optional().describe("Any additional context")
 });
 
@@ -173,6 +174,7 @@ async function runExpenseAgent(content: string, source: string) {
     - DO NOT use "Balance" if it is 0.00 (this means the bill is just paid). Use "Total Charges" or "Net Amount".
     - DATE INTERPRETATION: Interpret source dates as DD/MM/YYYY. (e.g., 01/12 is December 1st). 
     - DATE OUTPUT: ALWAYS return YYYY-MM-DD.
+    - CARD DIGITS: If you see the last 4 digits of a payment card (e.g. **** 4477), extract them into 'cd'.
     - If the document mentions travel (flight, hotel, visa), 'travel_logs' MUST NOT BE EMPTY.
     
     CATEGORIES: Transport, Meals, Lodging, Office, Utilities, Salary, Transfer, General.
@@ -241,6 +243,7 @@ async function runBatchExpenseAgent(inputs: { content: string, source: string }[
     TRAVEL LOG SPECIFICS:
     - HOTEL LOG RULES: type: 'accommodation', provider: Hotel Name, date: Check-in, end_date: Check-out.
     - FLIGHT LOG RULES: type: 'flight', provider: Airline, date: Departure, end_date: Return.
+    - CARD DIGITS: If you see the last 4 digits of a payment card (e.g. Card: **** 4477), extract them into 'cd'.
     - CONSOLIDATION: One document = ONE record. Merge all flight legs.
     - DATES: 'date' = departure, 'end_date' = return.
   `;

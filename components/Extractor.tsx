@@ -24,6 +24,7 @@ import { Expense, ExpenseSource, TravelLog } from '../types';
 
 interface ExtractorProps {
   onExtract: (data: { expenses: Expense[], travelLogs: TravelLog[] }) => void;
+  bankMappings: any[];
 }
 
 interface FilePreview {
@@ -40,7 +41,7 @@ interface FilePreview {
 
 const MAX_IMAGE_WIDTH = 800; // Reduced from 1024 for tighter token optimization
 
-const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
+const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
   const [activeMode, setActiveMode] = useState<ExpenseSource>('receipt');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string>('');
@@ -174,7 +175,20 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract }) => {
         }
 
         const res = await batchExtractAllData(chunk, selectedBank === 'Other' ? customBankName : selectedBank);
-        allExpenses.push(...res.expenses);
+
+        // --- AUTO-PILOT MAPPING LOGIC ---
+        const mappedExpenses = res.expenses.map(exp => {
+          if (exp.card_digits) {
+            const match = bankMappings.find(m => m.card_digits === exp.card_digits);
+            if (match) {
+              console.log(`[Auto-Pilot] Mapped card ${exp.card_digits} to ${match.bank_name}`);
+              return { ...exp, bank: match.bank_name };
+            }
+          }
+          return exp;
+        });
+
+        allExpenses.push(...mappedExpenses);
         allTravelLogs.push(...res.travelLogs);
       }
 
