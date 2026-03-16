@@ -38,6 +38,7 @@ interface DashboardProps {
   onFilterBankChange: (bank: string) => void;
   session: UserSession | null;
   customCategories?: string[];
+  bankMappings?: any[];
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -49,7 +50,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onFilterBankChange,
   session,
   onUpdate,
-  customCategories = []
+  customCategories = [],
+  bankMappings = []
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("All Types");
@@ -446,7 +448,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                             >
                               {e.merchant}
                               {session?.role === 'admin' && <Edit3 size={10} className="inline ml-2 opacity-0 group-hover:opacity-40" />}
-                              {e.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({e.bank})</span>}
+                              {(() => {
+                                const displayedBank = e.bank || (e.card_digits ? bankMappings.find(m => m.card_digits === e.card_digits)?.bank_name : "");
+                                return displayedBank ? (
+                                  <span className="ml-2 text-[11px] text-brand-600 font-bold uppercase tracking-tight">({displayedBank})</span>
+                                ) : null;
+                              })()}
                             </span>
                           )}
                           {isVerified && (
