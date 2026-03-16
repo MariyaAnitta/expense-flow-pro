@@ -454,13 +454,11 @@ export const updateUserRole = async (uid: string, role: 'admin' | 'employee' | '
   return await setDoc(doc(db, 'authorized_users', uid), { role, updated_at: new Date().toISOString() }, { merge: true });
 };
 
-// --- BANK REGISTRY METHODS ---
+// --- BANK REGISTRY METHODS (Shared Company-Wide) ---
 export const subscribeToBankRegistry = (callback: (mappings: any[]) => void) => {
-  const session = getSession();
-  if (!session) return () => { };
   const q = query(
     collection(db, 'bank_registry'),
-    where('user_id', '==', session.email)
+    orderBy('created_at', 'desc')
   );
   return onSnapshot(q, (snapshot: any) => {
     callback(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));

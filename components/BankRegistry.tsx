@@ -155,11 +155,11 @@ const BankRegistry: React.FC<BankRegistryProps> = ({ mappings }) => {
                                     <select
                                         required
                                         className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
-                                        value={["Amex", "Citi", "HSBC", "Standard Chartered", ""].includes(newMapping.bank_name) ? newMapping.bank_name : 'Other'}
+                                        value={["Amex", "Citi", "HSBC", "Standard Chartered"].includes(newMapping.bank_name) ? newMapping.bank_name : (newMapping.bank_name === '' ? '' : 'Other')}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             if (val === 'Other') {
-                                                setNewMapping({ ...newMapping, bank_name: '' });
+                                                setNewMapping({ ...newMapping, bank_name: ' ' }); // Use a space as a 'custom mode' flag
                                             } else {
                                                 setNewMapping({ ...newMapping, bank_name: val });
                                             }
@@ -173,7 +173,7 @@ const BankRegistry: React.FC<BankRegistryProps> = ({ mappings }) => {
                                     </select>
                                 </div>
 
-                                {(newMapping.bank_name !== '' && !["Amex", "Citi", "HSBC", "Standard Chartered"].includes(newMapping.bank_name)) && (
+                                {(!["Amex", "Citi", "HSBC", "Standard Chartered", ""].includes(newMapping.bank_name.trim()) || newMapping.bank_name === ' ') && (
                                     <div className="animate-in slide-in-from-top-2 duration-200">
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1 text-brand-500">Specify Bank Name</label>
                                         <input
@@ -181,7 +181,7 @@ const BankRegistry: React.FC<BankRegistryProps> = ({ mappings }) => {
                                             required
                                             placeholder="e.g. Emirates NBD"
                                             className="w-full bg-slate-50 dark:bg-slate-800/50 border border-brand-200 dark:border-brand-900 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:text-white"
-                                            value={newMapping.bank_name}
+                                            value={newMapping.bank_name === ' ' ? '' : newMapping.bank_name}
                                             onChange={(e) => setNewMapping({ ...newMapping, bank_name: e.target.value })}
                                         />
                                     </div>
