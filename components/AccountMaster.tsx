@@ -49,6 +49,7 @@ interface AccountMasterProps {
     settings: AppSettings;
     customCategories?: string[];
     session: any;
+    bankMappings?: any[];
 }
 
 const STANDARD_CATEGORIES = ['Transport', 'Meals', 'Lodging', 'Office', 'Utilities', 'Salary', 'Transfer', 'General'];
