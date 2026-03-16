@@ -458,6 +458,7 @@ const App: React.FC = () => {
                 customCategories={appSettings.custom_expense_heads}
                 allExpenses={[...internalExpenses, ...telegramExpenses]}
                 session={session}
+                bankMappings={bankMappings}
               />
             )}
             {activeTab === AppTab.SYSTEM_SETTINGS && (

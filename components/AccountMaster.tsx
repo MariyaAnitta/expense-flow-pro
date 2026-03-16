@@ -64,7 +64,8 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
     settings,
     customCategories = [],
     allExpenses = [],
-    session
+    session,
+    bankMappings = []
 }) => {
     const [editingIdentityId, setEditingIdentityId] = useState<string | null>(null);
     const [editingClassificationId, setEditingClassificationId] = useState<string | null>(null);
@@ -264,12 +265,38 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                                     <button onClick={() => handleUpdateIdentity(expense.id)} className="p-2 bg-brand-600 text-white rounded-xl shadow-lg shadow-brand-500/20"><Check size={14} /></button>
                                                 </div>
                                             ) : (
-                                                <div
-                                                    className="flex items-center gap-3 cursor-pointer hover:text-brand-600 transition-colors"
-                                                    onClick={() => { setEditingIdentityId(expense.id); setTempIdentity(expense.merchant); }}
-                                                >
-                                                    <span className="text-sm font-black dark:text-white uppercase tracking-tight">{expense.merchant}</span>
-                                                    <Edit3 size={12} className="opacity-0 group-hover:opacity-40" />
+                                                <div className="flex flex-col gap-1 items-start group relative">
+                                                    <div
+                                                        className="flex items-center gap-3 cursor-pointer hover:text-brand-600 transition-colors"
+                                                        onClick={() => { setEditingIdentityId(expense.id); setTempIdentity(expense.merchant); }}
+                                                    >
+                                                        <span className="text-sm font-black dark:text-white uppercase tracking-tight">{expense.merchant}</span>
+                                                        <Edit3 size={12} className="opacity-0 group-hover:opacity-40" />
+                                                    </div>
+
+                                                    {(() => {
+                                                        const mDigits = expense.card_digits?.replace(/\D/g, '').slice(-4);
+                                                        const match = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits);
+                                                        const displayedBank = expense.bank || match?.bank_name;
+
+                                                        return (displayedBank || expense.card_digits) ? (
+                                                            <div className="flex flex-col gap-0.5">
+                                                                {displayedBank && (
+                                                                    <span className="text-[10px] font-black text-brand-600 uppercase tracking-tight leading-none">
+                                                                        {displayedBank}
+                                                                    </span>
+                                                                )}
+                                                                {expense.card_digits && (
+                                                                    <div className="flex items-center gap-1.5 opacity-40">
+                                                                        <CreditCard size={10} />
+                                                                        <span className="text-[9px] font-bold tracking-widest leading-none underline underline-offset-2 decoration-brand-500/30">
+                                                                            **** {expense.card_digits.slice(-4)}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : null;
+                                                    })()}
                                                 </div>
                                             )}
                                         </td>
@@ -343,8 +370,8 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                                         {src === 'email' && <Mail size={13} className="text-pink-500" />}
                                                         {src === 'forwarded_email' && <Mail size={13} className="text-pink-500" />}
                                                         <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${isBot ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                                                : src.includes('statement') ? 'bg-sky-50 text-sky-600 border border-sky-100'
-                                                                    : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                                            : src.includes('statement') ? 'bg-sky-50 text-sky-600 border border-sky-100'
+                                                                : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
                                                             }`}>
                                                             {label}
                                                         </span>
