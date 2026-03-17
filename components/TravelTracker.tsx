@@ -155,7 +155,10 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       return sMatch || eMatch;
     });
 
-    const allFlights = monthLogs.filter(l => l.travel_type === 'flight');
+    const allFlights = monthLogs
+      .filter(l => l.travel_type === 'flight')
+      .sort((a, b) => new Date(a.departure_date || a.start_date).getTime() - new Date(b.departure_date || b.start_date).getTime());
+
     const processedFlightIds = new Set<string>();
     const hotelLogs = logs.filter(l => l.travel_type === 'accommodation');
     const lodgingExpenses = expenses.filter(e => {
@@ -172,10 +175,13 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     allFlights.forEach(flight => {
       if (processedFlightIds.has(flight.id)) return;
 
+      const destCountry = (flight.destination_country || "").toLowerCase();
+      const originCountry = (flight.origin_country || "").toLowerCase();
+      const isHomeReturn = isHomeLocation(destCountry);
+
+      // We only anchor segments on movements AWAY from home, or standalone movements if no home-based return is found
       const tripStartStr = flight.departure_date || flight.start_date;
       const tripStart = new Date(tripStartStr);
-      const originCountry = (flight.origin_country || "").toLowerCase();
-      const destCountry = (flight.destination_country || "").toLowerCase();
 
       // FORENSIC PAIRING: Look for a reciprocal return leg
       const returnLeg = allFlights.find(f => {
@@ -183,8 +189,11 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         const fDate = new Date(f.departure_date || f.start_date);
         const fOrigin = (f.origin_country || "").toLowerCase();
         const fDest = (f.destination_country || "").toLowerCase();
+
+        // Match if countries are swapped OR if return originates from previous destination
         const swapMatch = (fOrigin && destCountry && (fOrigin.includes(destCountry) || destCountry.includes(fOrigin))) &&
-          (fDest && originCountry && (fDest.includes(originCountry) || originCountry.includes(fDest)));
+          (isHomeLocation(fDest) || (fDest && originCountry && (fDest.includes(originCountry) || originCountry.includes(fDest))));
+
         return swapMatch && fDate >= tripStart;
       });
 
@@ -237,7 +246,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         status: hMatch ? 'verified' : 'action_required',
         provider: returnLeg ? `${flight.provider_name} + ${returnLeg.provider_name}` : flight.provider_name,
         financials: {
-          flightAmt: (fMatch?.amount || 0) + (rMatch?.amount || 0),
+          flightAmt: (fMatch?.amount || 0) + (rMatch?.amount || 0) || undefined,
           flightCurr: fMatch?.currency || rMatch?.currency || 'AED',
           hotelAmt: hMatch?.amount,
           hotelCurr: hMatch?.currency
