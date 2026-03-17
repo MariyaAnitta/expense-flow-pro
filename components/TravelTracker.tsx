@@ -155,7 +155,8 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       return sMatch || eMatch;
     });
 
-    const flightLogs = monthLogs.filter(l => l.travel_type === 'flight' && !l.outbound_flight_id);
+    const allFlights = monthLogs.filter(l => l.travel_type === 'flight');
+    const processedFlightIds = new Set<string>();
     const hotelLogs = logs.filter(l => l.travel_type === 'accommodation');
     const lodgingExpenses = expenses.filter(e => {
       const cat = (e.category || "").toLowerCase();
@@ -167,10 +168,36 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     const result: JurisdictionSegment[] = [];
     const usedIds = new Set<string>(); // EXCLUSIVITY REGISTER (1:1 Locks)
 
-    // 2. PROCESS FLIGHTS (Primary Anchors)
-    flightLogs.forEach(flight => {
-      const tripStart = new Date(flight.departure_date || flight.start_date);
-      const tripEnd = new Date(flight.return_date || flight.end_date || flight.start_date);
+    // 2. PROCESS FLIGHTS (Primary Anchors with Pairing)
+    allFlights.forEach(flight => {
+      if (processedFlightIds.has(flight.id)) return;
+
+      const tripStartStr = flight.departure_date || flight.start_date;
+      const tripStart = new Date(tripStartStr);
+      const originCountry = (flight.origin_country || "").toLowerCase();
+      const destCountry = (flight.destination_country || "").toLowerCase();
+
+      // FORENSIC PAIRING: Look for a reciprocal return leg
+      const returnLeg = allFlights.find(f => {
+        if (f.id === flight.id || processedFlightIds.has(f.id)) return false;
+        const fDate = new Date(f.departure_date || f.start_date);
+        const fOrigin = (f.origin_country || "").toLowerCase();
+        const fDest = (f.destination_country || "").toLowerCase();
+        const swapMatch = (fOrigin && destCountry && (fOrigin.includes(destCountry) || destCountry.includes(fOrigin))) &&
+          (fDest && originCountry && (fDest.includes(originCountry) || originCountry.includes(fDest)));
+        return swapMatch && fDate >= tripStart;
+      });
+
+      const tripEndStr = returnLeg ? (returnLeg.departure_date || returnLeg.start_date) : (flight.return_date || flight.end_date || flight.start_date);
+      const tripEnd = new Date(tripEndStr);
+
+      const tripDays = returnLeg
+        ? Math.max(1, Math.round((tripEnd.getTime() - tripStart.getTime()) / 86400000) + 1)
+        : (flight.days_spent || 1);
+
+      processedFlightIds.add(flight.id);
+      if (returnLeg) processedFlightIds.add(returnLeg.id);
+
       const flightDest = (flight.destination_country || "").toLowerCase();
 
       // DUAL-SOURCE STAY PROOF + GEOGRAPHY GUARD (Ensures hotels link to the right country)
@@ -190,6 +217,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
 
       // 1:1 FORENSIC MATCHING (Locks the receipt/transaction so it's not reused)
       const fMatch = getFinancialMatch(flight, 'flight', null, usedIds);
+      const rMatch = returnLeg ? getFinancialMatch(returnLeg, 'flight', null, usedIds) : null;
       const hMatch = getFinancialMatch(
         linkedHotel || (linkedHotelExpense ? { start_date: linkedHotelExpense.date, provider_name: linkedHotelExpense.merchant, travel_type: 'accommodation' } as any : null),
         'accommodation',
@@ -201,16 +229,16 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         id: flight.id,
         country: flight.destination_country || "Unknown",
         city: flight.destination_city || "Various",
-        days: flight.days_spent || 1,
-        startDate: flight.departure_date || flight.start_date,
-        endDate: flight.return_date || flight.end_date || flight.start_date,
+        days: tripDays,
+        startDate: tripStartStr,
+        endDate: tripEndStr,
         flight: flight,
         hotel: linkedHotel || (linkedHotelExpense ? { provider_name: linkedHotelExpense.merchant } as any : null),
         status: hMatch ? 'verified' : 'action_required',
-        provider: flight.provider_name,
+        provider: returnLeg ? `${flight.provider_name} + ${returnLeg.provider_name}` : flight.provider_name,
         financials: {
-          flightAmt: fMatch?.amount,
-          flightCurr: fMatch?.currency,
+          flightAmt: (fMatch?.amount || 0) + (rMatch?.amount || 0),
+          flightCurr: fMatch?.currency || rMatch?.currency || 'AED',
           hotelAmt: hMatch?.amount,
           hotelCurr: hMatch?.currency
         }
