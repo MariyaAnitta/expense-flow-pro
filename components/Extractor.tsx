@@ -155,7 +155,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
 
       inputs.push({
         content: extractionInput,
-        source: p.type.startsWith('image/') ? 'receipt' : (p.isEmail ? 'email' : (p.isCsv ? 'bank_statement' : 'web_upload')) as any,
+        source: activeMode === 'receipt' ? 'web_upload' : activeMode,
         bank: (selectedBank === 'Other' ? customBankName : selectedBank),
       });
     }
