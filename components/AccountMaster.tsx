@@ -33,7 +33,8 @@ import {
     Mail,
     Database,
     CreditCard,
-    MessageCircle
+    MessageCircle,
+    Zap
 } from 'lucide-react';
 import TravelTracker from './TravelTracker';
 
@@ -277,26 +278,48 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
 
                                                     {(() => {
                                                         const mDigits = expense.card_digits?.replace(/\D/g, '').slice(-4);
-                                                        const match = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits);
-                                                        const displayedBank = expense.bank || match?.bank_name;
+                                                        const registryMatch = mDigits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits) : null;
 
-                                                        return (displayedBank || expense.card_digits) ? (
-                                                            <div className="flex flex-col gap-0.5">
-                                                                {displayedBank && (
-                                                                    <span className="text-[10px] font-black text-brand-600 uppercase tracking-tight leading-none">
-                                                                        {displayedBank}
-                                                                    </span>
-                                                                )}
-                                                                {expense.card_digits && (
-                                                                    <div className="flex items-center gap-1.5 opacity-40">
+                                                        // Priority 1: Bank Registry (Verified Proof)
+                                                        if (registryMatch) {
+                                                            return (
+                                                                <div className="flex flex-col gap-1 mt-1">
+                                                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-lg text-[10px] font-black border border-brand-100 dark:border-brand-500/20 shadow-sm w-fit">
+                                                                        <Zap size={10} className="fill-brand-600" />
+                                                                        {registryMatch.bank_name}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5 opacity-40 ml-1">
                                                                         <CreditCard size={10} />
                                                                         <span className="text-[9px] font-bold tracking-widest leading-none underline underline-offset-2 decoration-brand-500/30">
-                                                                            **** {expense.card_digits.slice(-4)}
+                                                                            **** {mDigits}
                                                                         </span>
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        ) : null;
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        // Priority 2: Manual Selection (Intent)
+                                                        if (expense.bank || expense.card_digits) {
+                                                            return (
+                                                                <div className="flex flex-col gap-0.5 mt-1">
+                                                                    {expense.bank && (
+                                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight leading-none italic ml-1">
+                                                                            ({expense.bank})
+                                                                        </span>
+                                                                    )}
+                                                                    {expense.card_digits && (
+                                                                        <div className="flex items-center gap-1.5 opacity-40 ml-1">
+                                                                            <CreditCard size={10} />
+                                                                            <span className="text-[9px] font-bold tracking-widest leading-none">
+                                                                                **** {expense.card_digits.slice(-4)}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return null;
                                                     })()}
                                                 </div>
                                             )}

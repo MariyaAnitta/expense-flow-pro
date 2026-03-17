@@ -273,7 +273,7 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       if (!pair) return false;
       const rDigits = pair.receipt.card_digits?.replace(/\D/g, '').slice(-4);
       const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
-      const receiptBank = pair.receipt.bank || rMatch?.bank_name;
+      const receiptBank = rMatch?.bank_name || pair.receipt.bank;
 
       return isTargetPeriod(pair.bank.date) &&
         (auditBank === "All Accounts" || pair.bank.bank === auditBank || receiptBank === auditBank);
@@ -530,10 +530,21 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                           {(() => {
                             const rDigits = pair.receipt?.card_digits?.replace(/\D/g, '').slice(-4);
                             const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
-                            const displayedBank = pair.receipt?.bank || rMatch?.bank_name;
-                            return displayedBank ? (
-                              <span className="text-[9px] text-brand-500 font-bold">({displayedBank})</span>
-                            ) : null;
+
+                            if (rMatch) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-lg text-[9px] font-black border border-brand-100 dark:border-brand-500/20 shadow-sm align-middle">
+                                  <Zap size={8} className="fill-brand-600" />
+                                  {rMatch.bank_name}
+                                </span>
+                              );
+                            }
+
+                            if (pair.receipt?.bank) {
+                              return <span className="text-[9px] text-slate-500 font-bold italic ml-1 align-middle">({pair.receipt.bank})</span>;
+                            }
+
+                            return null;
                           })()}
                           {pair.receipt?.user_id === 'SHARED_POOL' && (
                             <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[8px] px-2 py-0.5 rounded-full font-black">POOL</span>
@@ -608,10 +619,21 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                         {(() => {
                           const rDigits = exp.card_digits?.replace(/\D/g, '').slice(-4);
                           const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
-                          const displayedBank = exp.bank || rMatch?.bank_name;
-                          return displayedBank ? (
-                            <span className="ml-2 text-[9px] text-brand-500 font-bold">({displayedBank})</span>
-                          ) : null;
+
+                          if (rMatch) {
+                            return (
+                              <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-lg text-[9px] font-black border border-brand-100 dark:border-brand-500/20 shadow-sm align-middle">
+                                <Zap size={8} className="fill-brand-600" />
+                                {rMatch.bank_name}
+                              </span>
+                            );
+                          }
+
+                          if (exp.bank) {
+                            return <span className="ml-2 text-[9px] text-red-500/60 font-bold italic align-middle">({exp.bank})</span>;
+                          }
+
+                          return null;
                         })()}
                       </div>
                       <div className="text-[10px] text-red-600 font-bold uppercase mt-1">{exp.category} • {exp.date}</div>
@@ -643,10 +665,21 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                         {(() => {
                           const rDigits = exp.card_digits?.replace(/\D/g, '').slice(-4);
                           const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
-                          const displayedBank = exp.bank || rMatch?.bank_name;
-                          return displayedBank ? (
-                            <span className="ml-2 text-[9px] text-brand-500 font-bold">({displayedBank})</span>
-                          ) : null;
+
+                          if (rMatch) {
+                            return (
+                              <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-lg text-[9px] font-black border border-brand-100 dark:border-brand-500/20 shadow-sm align-middle">
+                                <Zap size={8} className="fill-brand-600" />
+                                {rMatch.bank_name}
+                              </span>
+                            );
+                          }
+
+                          if (exp.bank) {
+                            return <span className="ml-2 text-[9px] text-slate-500/60 font-bold italic align-middle">({exp.bank})</span>;
+                          }
+
+                          return null;
                         })()}
                       </div>
                       <div className="text-[10px] font-bold text-slate-400">

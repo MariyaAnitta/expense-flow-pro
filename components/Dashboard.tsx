@@ -23,7 +23,8 @@ import {
   Lock,
   Edit3,
   Check,
-  MessageCircle
+  MessageCircle,
+  Zap
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
 import { UserSession } from '../authService';
@@ -164,8 +165,10 @@ const Dashboard: React.FC<DashboardProps> = ({
         (filterSource === "Email Alert" && e.source === "email");
       if (!matchesSource) return false;
 
-      // 6. Bank Filter
-      const reactiveBank = e.bank || (e.card_digits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === e.card_digits.replace(/\D/g, '').slice(-4))?.bank_name : "");
+      // 6. Bank Filter (Hierarchy of Truth: Registry > Manual)
+      const mDigits = e.card_digits?.replace(/\D/g, '').slice(-4);
+      const registryMatch = mDigits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits) : null;
+      const reactiveBank = registryMatch?.bank_name || e.bank || "";
       const matchesBank = filterBank === "All Accounts" || reactiveBank === filterBank;
       if (!matchesBank) return false;
 
@@ -450,19 +453,24 @@ const Dashboard: React.FC<DashboardProps> = ({
                               {e.merchant}
                               {session?.role === 'admin' && <Edit3 size={10} className="inline ml-2 opacity-0 group-hover:opacity-40" />}
                               {(() => {
-                                if (!e.card_digits && !e.bank) return null;
+                                const mDigits = e.card_digits?.replace(/\D/g, '').slice(-4);
+                                const registryMatch = mDigits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits) : null;
 
-                                // Priority 1: Bank already in record
-                                if (e.bank) return <span className="ml-2 text-[11px] text-brand-600 font-bold uppercase tracking-tight">({e.bank})</span>;
-
-                                // Priority 2: Reactive lookup if digits exist
-                                if (e.card_digits) {
-                                  const cleanE = e.card_digits.replace(/\D/g, '').slice(-4);
-                                  const match = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === cleanE);
-                                  if (match) {
-                                    return <span className="ml-2 text-[11px] text-brand-600 font-bold uppercase tracking-tight">({match.bank_name})</span>;
-                                  }
+                                // Priority 1: Bank Registry (Verified Proof)
+                                if (registryMatch) {
+                                  return (
+                                    <span className="ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-lg text-[10px] font-black border border-brand-100 dark:border-brand-500/20 shadow-sm align-middle">
+                                      <Zap size={10} className="fill-brand-600" />
+                                      {registryMatch.bank_name}
+                                    </span>
+                                  );
                                 }
+
+                                // Priority 2: Manual Selection (Intent)
+                                if (e.bank) {
+                                  return <span className="ml-2 text-[11px] text-slate-500 font-bold uppercase tracking-tight italic">({e.bank})</span>;
+                                }
+
                                 return null;
                               })()}
                             </span>
