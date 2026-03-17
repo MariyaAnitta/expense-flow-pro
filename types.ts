@@ -144,6 +144,7 @@ export interface ReconciliationReport {
 
 export interface AppSettings {
   audit_threshold: number;
+  reporting_currency?: string; // e.g. 'USD', 'AED', 'OMR'
   custom_expense_heads: string[];
   updated_at?: string;
 }

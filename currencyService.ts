@@ -81,40 +81,74 @@ export const getExchangeRates = async (dateStr?: string): Promise<ExchangeRates 
 };
 
 /**
- * Normalizes any amount to USD ($) using the specific month's rate.
- * The `rates` parameter can now be a Dictionary of monthly rates, or a single rate object.
- * To support legacy code that just passes a single `rates` object, we check the structure.
+ * Gets the currency symbol for the given code.
  */
-export const convertToUSD = (amount: number, fromCurrency: string, ratesData: any, referenceDate?: string): number => {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'USD') return amount;
+export const getCurrencySymbol = (code: string): string => {
+  const symbols: Record<string, string> = {
+    'USD': '$',
+    'AED': 'د.إ',
+    'OMR': 'ر.ع.',
+    'SAR': 'ر.س',
+    'INR': '₹',
+    'EUR': '€',
+    'GBP': '£'
+  };
+  return symbols[code.toUpperCase()] || code;
+};
+
+/**
+ * List of supported reporting currencies.
+ */
+export const getSupportedCurrencies = () => ['USD', 'AED', 'OMR', 'SAR', 'INR', 'EUR', 'GBP'];
+
+/**
+ * Normalizes any amount to a target Base Currency using the specific month's rate.
+ * Uses USD as the bridge currency for maximum stability.
+ */
+export const convertToBaseCurrency = (
+  amount: number,
+  fromCurrency: string,
+  targetCurrency: string,
+  ratesData: any,
+  referenceDate?: string
+): number => {
+  const from = fromCurrency.toUpperCase();
+  const target = targetCurrency.toUpperCase();
+
+  if (from === target) return amount;
 
   // Determine correct rates to use based on the input structure
   let activeRates: Record<string, number> = {};
+  const monthKey = getMonthKey(referenceDate);
 
-  if (ratesData && ratesData[getMonthKey(referenceDate)]?.rates) {
-    // It's a dictionary of monthly rates { "2026-03": { rates: {...} } }
-    activeRates = ratesData[getMonthKey(referenceDate)].rates;
+  if (ratesData && ratesData[monthKey]?.rates) {
+    activeRates = ratesData[monthKey].rates;
   } else if (ratesData && ratesData.rates) {
-    // It's a single straight ExchangeRates object
     activeRates = ratesData.rates;
   } else if (ratesData) {
-    // It's just the raw rates record
     activeRates = ratesData;
   }
 
-  const rate = activeRates[currency];
-  if (!rate) {
-    // Fallback if rate is missing for that specific currency
-    return amount;
+  // 1. Convert "from" to USD bridge
+  let amountInUSD = amount;
+  if (from !== 'USD') {
+    const fromRate = activeRates[from];
+    if (fromRate) amountInUSD = amount / fromRate;
   }
 
-  return amount / rate;
+  // 2. Convert USD bridge to "target"
+  if (target === 'USD') return amountInUSD;
+
+  const targetRate = activeRates[target];
+  if (!targetRate) return amountInUSD; // Fallback to USD if target rate missing
+
+  return amountInUSD * targetRate;
 };
 
-// Legacy support for internal mapping if needed
-export const convertToINR = (amount: number, fromCurrency: string, rates: Record<string, number>): number => {
-  const usd = convertToUSD(amount, fromCurrency, rates);
-  const inrRate = rates['INR'] || 83; // Fallback to current avg
-  return usd * inrRate;
+/**
+ * Legacy support / Wrapper for existing USD-dependent code
+ */
+export const convertToUSD = (amount: number, fromCurrency: string, ratesData: any, referenceDate?: string): number => {
+  return convertToBaseCurrency(amount, fromCurrency, 'USD', ratesData, referenceDate);
 };
+

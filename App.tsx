@@ -439,11 +439,11 @@ const App: React.FC = () => {
         </header>
         <section className="flex-1 overflow-y-auto p-6 bg-[#f8fafc] dark:bg-[#020617]">
           <div className="max-w-screen-xl mx-auto">
-            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={filteredExpenses} onDelete={removeExpense} onUpdate={updateExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={setTargetClarifyId} filterBank={auditBank} onFilterBankChange={setAuditBank} session={session} customCategories={appSettings.custom_expense_heads} bankMappings={bankMappings} />}
+            {activeTab === AppTab.DASHBOARD && <Dashboard expenses={filteredExpenses} onDelete={removeExpense} onUpdate={updateExpense} period={{ month: selectedMonth, year: selectedYear }} onNavigateToClarify={handleJumpToClarify} filterBank={auditBank} onFilterBankChange={setAuditBank} session={session} customCategories={appSettings.custom_expense_heads} bankMappings={bankMappings} settings={appSettings} />}
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} bankMappings={bankMappings} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={filteredTravelLogs} expenses={filteredExpenses} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.RESOLVE && <ClarificationCenter expenses={filteredExpenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />} {/* Changed tab name */}
-            {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} currentUserEmail={session.email} bankMappings={bankMappings} />} {/* Passed appSettings.audit_threshold and currentUserEmail */}
+            {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} currentUserEmail={session.email} bankMappings={bankMappings} reportingCurrency={appSettings.reporting_currency || 'USD'} />}
             {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} session={session} />}
             {activeTab === AppTab.ACCOUNT_MASTER && (
               <AccountMaster

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Expense } from '../types';
+import { Expense, AppSettings } from '../types';
 import { convertToUSD } from '../currencyService';
 import {
   Receipt,
@@ -26,7 +26,7 @@ import {
   MessageCircle,
   Zap
 } from 'lucide-react';
-import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
+import { getExchangeRates, convertToBaseCurrency, getCurrencySymbol, ExchangeRates } from '../currencyService';
 import { UserSession } from '../authService';
 
 interface DashboardProps {
@@ -40,6 +40,7 @@ interface DashboardProps {
   session: UserSession | null;
   customCategories?: string[];
   bankMappings?: any[];
+  settings: AppSettings;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -52,7 +53,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   session,
   onUpdate,
   customCategories = [],
-  bankMappings = []
+  bankMappings = [],
+  settings
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("All Types");
@@ -86,11 +88,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     const rates = exchangeData.rates || {};
 
     anchors.forEach(bankTx => {
-      const bINR = convertToINR(bankTx.amount, bankTx.currency, rates);
+      const bUSD = convertToUSD(bankTx.amount, bankTx.currency, rates);
       const bDate = new Date(bankTx.date).getTime();
 
       const match = proofs.find(rec => {
-        const rINR = convertToINR(rec.amount, rec.currency, rates);
+        const rUSD = convertToUSD(rec.amount, rec.currency, rates);
         const rDate = new Date(rec.date).getTime();
 
         // Window Parity
@@ -106,7 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         // Amount Parity
         const sameCurrency = bankTx.currency === rec.currency;
-        const sameAmt = sameCurrency ? Math.abs(bankTx.amount - rec.amount) < 0.10 : Math.abs(bINR - rINR) < (bINR * 0.05);
+        const sameAmt = sameCurrency ? Math.abs(bankTx.amount - rec.amount) < 0.10 : Math.abs(bUSD - rUSD) < (bUSD * 0.05);
         return sameAmt;
       });
 
@@ -184,14 +186,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const stats = useMemo(() => {
     const rates = exchangeData || {};
-    const totalUSD = filteredExpenses.reduce((acc, curr) => acc + convertToUSD(curr.amount, curr.currency, rates, curr.date), 0);
+    const baseCurrency = settings?.reporting_currency || 'USD';
+    const totalConverted = filteredExpenses.reduce((acc, curr) => acc + convertToBaseCurrency(curr.amount, curr.currency, baseCurrency, rates, curr.date), 0);
     const count = filteredExpenses.length;
     const sources = filteredExpenses.reduce((acc: any, curr) => {
       acc[curr.source] = (acc[curr.source] || 0) + 1;
       return acc;
     }, {});
-    return { totalUSD, count, sources };
-  }, [filteredExpenses, exchangeData]);
+    return { totalConverted, count, sources };
+  }, [filteredExpenses, exchangeData, settings]);
 
   const formatTime = (isoString?: string) => {
     if (!isoString) return '';
@@ -253,7 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="absolute top-0 right-0 p-8 opacity-20"><Banknote size={80} /></div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Portfolio Burn</p>
-            <h4 className="text-4xl font-black tracking-tighter mt-1">${stats.totalUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h4>
+            <h4 className="text-4xl font-black tracking-tighter mt-1">{getCurrencySymbol(settings?.reporting_currency || 'USD')}{stats.totalConverted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h4>
           </div>
           <div className="bg-white/20 w-fit px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">
             {stats.count} Transacts
@@ -602,9 +605,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <div className="flex flex-col">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.currency}</span>
                         <span className="text-sm font-black text-slate-900 dark:text-white">{e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        {e.currency !== 'USD' && (
+                        {e.currency !== (settings?.reporting_currency || 'USD') && (
                           <span className="text-[10px] font-black text-brand-600 dark:text-brand-400 uppercase tracking-widest mt-0.5">
-                            ≈ ${convertToUSD(e.amount, e.currency, exchangeData || {}, e.date).toFixed(2)}
+                            ≈ {getCurrencySymbol(settings?.reporting_currency || 'USD')}{convertToBaseCurrency(e.amount, e.currency, settings?.reporting_currency || 'USD', exchangeData || {}, e.date).toFixed(2)}
                           </span>
                         )}
                         <span className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest mt-0.5">Gross Value</span>

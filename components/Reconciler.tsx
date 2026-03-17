@@ -27,7 +27,7 @@ import {
   Calendar as AuditCalendar,
   MessageCircle
 } from 'lucide-react';
-import { getExchangeRates, convertToUSD, ExchangeRates } from '../currencyService';
+import { getExchangeRates, convertToUSD, convertToBaseCurrency, getCurrencySymbol, ExchangeRates } from '../currencyService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -45,6 +45,7 @@ interface ReconcilerProps {
   evidenceThreshold: number;
   currentUserEmail: string;
   bankMappings?: any[];
+  reportingCurrency?: string;
 }
 
 const Reconciler: React.FC<ReconcilerProps> = ({
@@ -59,7 +60,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
   onBankChange,
   evidenceThreshold,
   currentUserEmail,
-  bankMappings = []
+  bankMappings = [],
+  reportingCurrency = 'USD'
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
 
@@ -340,7 +342,7 @@ const Reconciler: React.FC<ReconcilerProps> = ({
     const optionalMissing: Expense[] = [];
 
     finalUnmatchedBankTx.forEach(exp => {
-      const amountUSD = convertToUSD(exp.amount, exp.currency, rates);
+      const amountInBase = convertToBaseCurrency(exp.amount, exp.currency, reportingCurrency, rates);
       const merc = (exp.merchant || '').toLowerCase();
       const cat = (exp.category || '').toLowerCase();
 
@@ -348,11 +350,11 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       const isMandatory = ['travel', 'hotel', 'flight', 'airline', 'stay', 'flydubai', 'ibis', 'accommodation']
         .some(k => merc.includes(k) || cat.includes(k));
 
-      // 2. OPTIONAL LOGIC (Dynamic Threshold in USD)
+      // 2. OPTIONAL LOGIC (Dynamic Threshold in base currency)
       // Use exact word boundaries for sensitive words like 'tax' so it doesn't match 'taxi'
       const hasOptionalKeywords = ['bank charges', 'transfer', 'vat', 'finance', 'charge'].some(k => merc.includes(k) || cat.includes(k)) ||
         /\btax\b/.test(merc) || /\btax\b/.test(cat);
-      const isOptional = hasOptionalKeywords || amountUSD < evidenceThreshold;
+      const isOptional = hasOptionalKeywords || amountInBase < evidenceThreshold;
 
       if (isMandatory) mandatoryMissing.push(exp);
       else if (isOptional) optionalMissing.push(exp);
