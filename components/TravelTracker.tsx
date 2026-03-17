@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { TravelLog, Expense } from '../types';
 import { isHomeLocation } from '../firebaseService';
-import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
+import { getExchangeRates, convertToUSD, ExchangeRates } from '../currencyService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -124,11 +124,11 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     }
 
     if (bestProof) {
-      const pINR = convertToINR(bestProof.amount, bestProof.currency, rates);
+      const pUSD = convertToUSD(bestProof.amount, bestProof.currency, rates);
       const winner = [...candidates].sort((a, b) => {
-        const aINR = convertToINR(a.amount, a.currency, rates);
-        const bINR = convertToINR(b.amount, b.currency, rates);
-        return Math.abs(aINR - pINR) - Math.abs(bINR - pINR);
+        const aUSD = convertToUSD(a.amount, a.currency, rates);
+        const bUSD = convertToUSD(b.amount, b.currency, rates);
+        return Math.abs(aUSD - pUSD) - Math.abs(bUSD - pUSD);
       })[0];
       if (winner && usedIds) usedIds.add(winner.id);
       if (bestProof && usedIds) usedIds.add(bestProof.id);
