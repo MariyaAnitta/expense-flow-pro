@@ -19,7 +19,7 @@ async function handleApiResponse(response: Response) {
  * Calls the Genkit Agent backend to extract data from multiple documents in one batch.
  */
 export const batchExtractAllData = async (
-  inputs: Array<{ content: string | { data: string; mimeType: string }, source: ExpenseSource, sourceUrl?: string }>,
+  inputs: Array<{ content: string | { data: string; mimeType: string }, source: ExpenseSource }>,
   bankName?: string
 ): Promise<{ expenses: Expense[], travelLogs: TravelLog[] }> => {
 
@@ -51,7 +51,6 @@ export const batchExtractAllData = async (
     // result.results is the array of ExtractionOutputSchema results
     (result.results || []).forEach((batchItem: any, batchIdx: number) => {
       const source = inputs[batchIdx].source;
-      const sourceUrl = inputs[batchIdx].sourceUrl;
 
       const expenses = (batchItem.expenses || []).map((item: any, index: number) => ({
         id: `${source}-${Date.now()}-${batchIdx}-${index}`,
@@ -63,7 +62,6 @@ export const batchExtractAllData = async (
         description: source === 'bank_statement' || source === 'credit_card_statement' ? `${bankName || 'BANK'} TRANSACTION` : "PROOF DOCUMENT",
         bank: bankName,
         source,
-        source_url: sourceUrl,
         confidence: 1.0,
         created_at: new Date().toISOString(),
         items: item.items,
@@ -115,8 +113,7 @@ export const batchExtractAllData = async (
         guest_name: log.guest || "",
         status: 'Complete' as any,
         days_spent: 0,
-        document_id: docId,
-        source_url: sourceUrl
+        document_id: docId
       }));
 
       allExpenses.push(...expenses);

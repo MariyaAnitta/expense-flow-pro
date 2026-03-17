@@ -18,7 +18,6 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -32,7 +31,6 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-export const storage = getStorage(app);
 
 const sanitize = (data: any, seen = new WeakSet()): any => {
   if (data === null || data === undefined) return data;
@@ -75,12 +73,6 @@ const calculateDuration = (start: string, end?: string) => {
   const endDate = new Date(end || start);
   const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-};
-
-export const uploadFile = async (file: File | Blob, path: string): Promise<string> => {
-  const fileRef = ref(storage, path);
-  await uploadBytes(fileRef, file);
-  return getDownloadURL(fileRef);
 };
 
 export const addTravelLogs = async (logs: Omit<TravelLog, 'id'>[]) => {

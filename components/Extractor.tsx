@@ -19,8 +19,8 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
-import { extractAllData, batchExtractAllData } from '../geminiService';
-import { uploadFile, auth } from '../firebaseService';
+import { batchExtractAllData } from '../geminiService';
+import { auth } from '../firebaseService';
 import { Expense, ExpenseSource, TravelLog } from '../types';
 
 interface ExtractorProps {
@@ -143,16 +143,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
 
     for (let i = 0; i < previews.length; i++) {
       const p = previews[i];
-      setProcessingStatus(`Uploading ${p.name}...`);
-
-      let sourceUrl = undefined;
-      try {
-        const storagePath = `documents/${userId}/${Date.now()}_${p.name}`;
-        sourceUrl = await uploadFile(p.rawFile, storagePath);
-        console.log(`[Storage] Uploaded ${p.name} to ${sourceUrl}`);
-      } catch (uploadError) {
-        console.error(`[Storage] Failed to upload ${p.name}:`, uploadError);
-      }
+      setProcessingStatus(`Analyzing ${p.name}...`);
 
       let extractionInput: string | { data: string; mimeType: string };
       if (p.isEmail || p.isCsv) {
@@ -164,9 +155,8 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
 
       inputs.push({
         content: extractionInput,
-        source: activeMode === 'receipt' ? 'web_upload' : activeMode,
+        source: p.type.startsWith('image/') ? 'receipt' : (p.isEmail ? 'email' : (p.isCsv ? 'bank_statement' : 'web_upload')) as any,
         bank: (selectedBank === 'Other' ? customBankName : selectedBank),
-        sourceUrl
       });
     }
 

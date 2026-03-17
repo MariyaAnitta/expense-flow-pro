@@ -45,7 +45,6 @@ export interface TravelLog {
   usage_history?: UsageLog[];
   reconciled_by?: string;
   reconciled_at?: string;
-  source_url?: string;
 }
 
 export interface Expense {
@@ -98,7 +97,6 @@ export interface Expense {
   reconciled_by?: string;
   reconciled_at?: string;
   card_digits?: string; // Extracted last 4 digits
-  source_url?: string;
 }
 
 export interface ReconciliationResult {
