@@ -52,7 +52,7 @@ const sanitize = (data: any, seen = new WeakSet()): any => {
 
 export const isHomeLocation = (log: any) => {
   const dest = `${log.destination_country || ""} ${log.destination_city || ""}`.toLowerCase();
-  return /uae|emirates|dubai|united arab emirates/.test(dest);
+  return /uae|emirates|dubai|united arab emirates|^ae\b/.test(dest);
 };
 
 const mapExpenseData = (data: any): Expense => {

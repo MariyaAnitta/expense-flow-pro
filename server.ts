@@ -126,6 +126,8 @@ const TravelLogSchema = z.object({
     provider: z.string().describe("Airline or Hotel Name"),
     dest_city: z.string().describe("Destination City (or city of stay)"),
     dest_country: z.string().describe("Destination Country (or country of stay)"),
+    origin_city: z.string().optional().describe("Origin City (for flights)"),
+    origin_country: z.string().optional().describe("Origin Country (for flights)"),
     date: z.string().describe("Check-in or Departure Date (YYYY-MM-DD)"),
     end_date: z.string().optional().describe("Check-out or Return Flight Date (YYYY-MM-DD)"),
     ref: z.string().optional().describe("PNR or Booking Ref"),
@@ -183,6 +185,8 @@ async function runExpenseAgent(content: string, source: string) {
     - provider: Airline or Hotel Name.
     - dest_city: Destination City.
     - dest_country: Destination Country.
+    - origin_city: Departure City (for flights).
+    - origin_country: Departure Country (for flights).
     - HOTEL LOGS: type: 'accommodation', date: Check-in, end_date: Check-out.
   `;
 
@@ -242,7 +246,7 @@ async function runBatchExpenseAgent(inputs: { content: string, source: string }[
     
     TRAVEL LOG SPECIFICS:
     - HOTEL LOG RULES: type: 'accommodation', provider: Hotel Name, date: Check-in, end_date: Check-out.
-    - FLIGHT LOG RULES: type: 'flight', provider: Airline, date: Departure, end_date: Return.
+    - FLIGHT LOG RULES: type: 'flight', provider: Airline, date: Departure, end_date: Return, origin_country: Departure Country, dest_country: Arrival Country.
     - CARD DIGITS: If you see the last 4 digits of a payment card (e.g. Card: **** 4477), extract them into 'cd'.
     - CONSOLIDATION: One document = ONE record. Merge all flight legs.
     - DATES: 'date' = departure, 'end_date' = return.

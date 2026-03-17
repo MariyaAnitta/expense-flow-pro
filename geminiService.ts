@@ -101,6 +101,8 @@ export const batchExtractAllData = async (
         id: `travel-${Date.now()}-${batchIdx}-${index}`,
         destination_city: log.dest_city || "",
         destination_country: log.dest_country || "",
+        origin_city: log.origin_city || "",
+        origin_country: log.origin_country || "",
         start_date: log.date,
         end_date: log.end_date || log.date,
         departure_date: log.date,

@@ -175,32 +175,35 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
     allFlights.forEach(flight => {
       if (processedFlightIds.has(flight.id)) return;
 
-      const destCountry = (flight.destination_country || "").toLowerCase();
-      const originCountry = (flight.origin_country || "").toLowerCase();
-      const isHomeReturn = isHomeLocation(destCountry);
+      const isHomeReturn = isHomeLocation(flight);
 
-      // We only anchor segments on movements AWAY from home, or standalone movements if no home-based return is found
+      // We only anchor segments on movements AWAY from homebase
+      if (isHomeReturn) return;
+
       const tripStartStr = flight.departure_date || flight.start_date;
       const tripStart = new Date(tripStartStr);
+      const destCountry = (flight.destination_country || "").toLowerCase();
 
-      // FORENSIC PAIRING: Look for a reciprocal return leg
-      const returnLeg = allFlights.find(f => {
+      // BRIDGE LOGIC: Only for one-way departures. If the doc already has a return date, trust it.
+      const hasInternalReturn = flight.return_date && flight.return_date !== flight.start_date;
+
+      const returnLeg = !hasInternalReturn ? allFlights.find(f => {
         if (f.id === flight.id || processedFlightIds.has(f.id)) return false;
+        if (!isHomeLocation(f)) return false;
+
         const fDate = new Date(f.departure_date || f.start_date);
         const fOrigin = (f.origin_country || "").toLowerCase();
-        const fDest = (f.destination_country || "").toLowerCase();
 
-        // Match if countries are swapped OR if return originates from previous destination
-        const swapMatch = (fOrigin && destCountry && (fOrigin.includes(destCountry) || destCountry.includes(fOrigin))) &&
-          (isHomeLocation(fDest) || (fDest && originCountry && (fDest.includes(originCountry) || originCountry.includes(fDest))));
+        // Match if countries are swapped (Reciprocal leg)
+        const countryMatch = destCountry && (fOrigin.includes(destCountry) || destCountry.includes(fOrigin));
 
-        return swapMatch && fDate >= tripStart;
-      });
+        return countryMatch && fDate >= tripStart;
+      }) : null;
 
       const tripEndStr = returnLeg ? (returnLeg.departure_date || returnLeg.start_date) : (flight.return_date || flight.end_date || flight.start_date);
       const tripEnd = new Date(tripEndStr);
 
-      const tripDays = returnLeg
+      const tripDays = (returnLeg || hasInternalReturn)
         ? Math.max(1, Math.round((tripEnd.getTime() - tripStart.getTime()) / 86400000) + 1)
         : (flight.days_spent || 1);
 
@@ -497,10 +500,10 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
                     <div>
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Movement Proof</p>
                       <p className="text-[10px] font-bold dark:text-slate-300">
-                        {segment.flight ? segment.flight.provider_name : "No travel doc found"}
-                        {segment.financials?.flightAmt && (
+                        {segment.provider || (segment.flight ? segment.flight.provider_name : "No travel doc found")}
+                        {Boolean(segment.financials?.flightAmt) && (
                           <span className="ml-2 text-brand-500 text-[8px] font-black">
-                            {segment.financials.flightCurr} {segment.financials.flightAmt.toLocaleString()}
+                            {segment.financials?.flightCurr} {segment.financials?.flightAmt?.toLocaleString()}
                           </span>
                         )}
                       </p>
@@ -518,9 +521,9 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Stay Proof</p>
                       <p className="text-[10px] font-bold dark:text-slate-300">
                         {segment.hotel ? segment.hotel.provider_name : "Missing stay invoice"}
-                        {segment.financials?.hotelAmt && (
+                        {Boolean(segment.financials?.hotelAmt) && (
                           <span className="ml-2 text-emerald-600 text-[8px] font-black">
-                            {segment.financials.hotelCurr} {segment.financials.hotelAmt.toLocaleString()}
+                            {segment.financials?.hotelCurr} {segment.financials?.hotelAmt?.toLocaleString()}
                           </span>
                         )}
                       </p>
