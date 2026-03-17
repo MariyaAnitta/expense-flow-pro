@@ -517,7 +517,9 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
                       </p>
                     </div>
                   </div>
-                  {segment.financials?.flightAmt ? <ShieldCheck size={16} className="text-brand-500" /> : segment.flight ? <ShieldCheck size={16} className="text-emerald-500" /> : <Info size={16} className="text-slate-300" />}
+                  <div className="flex items-center gap-2">
+                    {segment.financials?.flightAmt ? <ShieldCheck size={16} className="text-brand-500" /> : segment.flight ? <ShieldCheck size={16} className="text-emerald-500" /> : <Info size={16} className="text-slate-300" />}
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between px-2">
@@ -537,7 +539,9 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
                       </p>
                     </div>
                   </div>
-                  {segment.status === 'verified' ? <ShieldCheck size={16} className="text-emerald-500" /> : <ShieldAlert size={16} className="text-orange-500" />}
+                  <div className="flex items-center gap-2">
+                    {segment.status === 'verified' ? <ShieldCheck size={16} className="text-emerald-500" /> : <ShieldAlert size={16} className="text-orange-500" />}
+                  </div>
                 </div>
               </div>
             </div>

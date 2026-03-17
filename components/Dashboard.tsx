@@ -24,7 +24,8 @@ import {
   Edit3,
   Check,
   MessageCircle,
-  Zap
+  Zap,
+  Download
 } from 'lucide-react';
 import { getExchangeRates, convertToINR, ExchangeRates } from '../currencyService';
 import { UserSession } from '../authService';
@@ -628,6 +629,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                           }`}>
                           {e.source === 'telegram' ? 'Telegram Bot' : e.source === 'whatsapp' ? 'WhatsApp Bot' : e.source === 'email' ? 'Email Alert' : e.source === 'forwarded_email' ? 'Forwarded Email' : e.source === 'web_upload' ? 'Web Document' : e.source.replace('_', ' ')}
                         </span>
+                        {e.source_url && (
+                          <a
+                            href={e.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 rounded-lg hover:bg-brand-100 transition-colors"
+                            title="Download Original Document"
+                          >
+                            <Download size={12} strokeWidth={3} />
+                          </a>
+                        )}
                       </div>
                     </td>
                     <td className="px-12 py-6 text-right">

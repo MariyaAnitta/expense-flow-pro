@@ -20,6 +20,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { extractAllData, batchExtractAllData } from '../geminiService';
+import { uploadFile, auth } from '../firebaseService';
 import { Expense, ExpenseSource, TravelLog } from '../types';
 
 interface ExtractorProps {
@@ -137,7 +138,22 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
     setSuccessCount(null);
     setCurrentFileIndex(0);
 
-    const inputs = previews.map(p => {
+    const inputs = [];
+    const userId = auth.currentUser?.uid || 'anonymous';
+
+    for (let i = 0; i < previews.length; i++) {
+      const p = previews[i];
+      setProcessingStatus(`Uploading ${p.name}...`);
+
+      let sourceUrl = undefined;
+      try {
+        const storagePath = `documents/${userId}/${Date.now()}_${p.name}`;
+        sourceUrl = await uploadFile(p.rawFile, storagePath);
+        console.log(`[Storage] Uploaded ${p.name} to ${sourceUrl}`);
+      } catch (uploadError) {
+        console.error(`[Storage] Failed to upload ${p.name}:`, uploadError);
+      }
+
       let extractionInput: string | { data: string; mimeType: string };
       if (p.isEmail || p.isCsv) {
         extractionInput = p.data;
@@ -145,14 +161,16 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
         const base64Data = p.data.split(',')[1] || '';
         extractionInput = { data: base64Data, mimeType: p.type || 'application/octet-stream' };
       }
-      return {
+
+      inputs.push({
         content: extractionInput,
         source: activeMode === 'receipt' ? 'web_upload' : activeMode,
-        bank: (selectedBank === 'Other' ? customBankName : selectedBank)
-      };
-    });
+        bank: (selectedBank === 'Other' ? customBankName : selectedBank),
+        sourceUrl
+      });
+    }
 
-    console.log("Extractor Inputs built:", inputs);
+    console.log("Extractor Inputs built with Source URLs:", inputs);
 
     try {
       const CHUNK_SIZE = 1; // Sequential processing to guarantee 1M token limit per request
