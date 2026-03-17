@@ -443,7 +443,7 @@ const App: React.FC = () => {
             {activeTab === AppTab.EXTRACT && <Extractor onExtract={handleAddData} bankMappings={bankMappings} />}
             {activeTab === AppTab.TRAVEL && <TravelTracker logs={filteredTravelLogs} expenses={filteredExpenses} period={{ month: selectedMonth, year: selectedYear }} />}
             {activeTab === AppTab.RESOLVE && <ClarificationCenter expenses={filteredExpenses} onResolve={handleResolveClarification} initialTargetId={targetClarifyId} onClearTarget={() => setTargetClarifyId(null)} />} {/* Changed tab name */}
-            {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} currentUserEmail={session.email} />} {/* Passed appSettings.audit_threshold and currentUserEmail */}
+            {activeTab === AppTab.RECONCILE && <Reconciler expenses={filteredExpenses} reconciliation={reconciliation} isProcessing={isProcessing} period={{ month: selectedMonth, year: selectedYear }} onSaveReport={handleSaveReport} isSaving={isSaving} saveSuccess={saveSuccess} auditBank={auditBank} onBankChange={setAuditBank} evidenceThreshold={appSettings.audit_threshold} currentUserEmail={session.email} bankMappings={bankMappings} />} {/* Passed appSettings.audit_threshold and currentUserEmail */}
             {activeTab === AppTab.REPORTS && <Reports period={{ month: selectedMonth, year: selectedYear }} session={session} />}
             {activeTab === AppTab.ACCOUNT_MASTER && (
               <AccountMaster

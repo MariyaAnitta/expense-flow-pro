@@ -44,6 +44,7 @@ interface ReconcilerProps {
   onBankChange?: (bank: string) => void;
   evidenceThreshold: number;
   currentUserEmail: string;
+  bankMappings?: any[];
 }
 
 const Reconciler: React.FC<ReconcilerProps> = ({
@@ -57,7 +58,8 @@ const Reconciler: React.FC<ReconcilerProps> = ({
   auditBank = "All Accounts",
   onBankChange,
   evidenceThreshold,
-  currentUserEmail
+  currentUserEmail,
+  bankMappings = []
 }) => {
   const [exchangeData, setExchangeData] = useState<ExchangeRates | null>(null);
 
@@ -267,11 +269,15 @@ const Reconciler: React.FC<ReconcilerProps> = ({
       if (diffDays > maxDays || !sameAmt || !mercMatch) return null;
 
       return { bank, receipt, label: m.proofLabel, summary: m.summary };
-    }).filter((pair): pair is { bank: Expense, receipt: Expense, label: string, summary: string } =>
-      pair !== null &&
-      isTargetPeriod(pair.bank.date) &&
-      (auditBank === "All Accounts" || pair.bank.bank === auditBank)
-    );
+    }).filter((pair): pair is { bank: Expense, receipt: Expense, label: string, summary: string } => {
+      if (!pair) return false;
+      const rDigits = pair.receipt.card_digits?.replace(/\D/g, '').slice(-4);
+      const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
+      const receiptBank = pair.receipt.bank || rMatch?.bank_name;
+
+      return isTargetPeriod(pair.bank.date) &&
+        (auditBank === "All Accounts" || pair.bank.bank === auditBank || receiptBank === auditBank);
+    });
 
     // 2. Heuristic Fallback Matcher (±3 Day Clearance Window)
     const matchedBankIds = new Set(matchedPairs.map(p => p.bank?.id).filter(Boolean));
@@ -521,6 +527,14 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                       <div>
                         <div className="font-black uppercase tracking-tight text-slate-900 dark:text-white text-[13px] flex items-center gap-2">
                           {pair.receipt?.merchant || 'Auto-Verified'}
+                          {(() => {
+                            const rDigits = pair.receipt?.card_digits?.replace(/\D/g, '').slice(-4);
+                            const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
+                            const displayedBank = pair.receipt?.bank || rMatch?.bank_name;
+                            return displayedBank ? (
+                              <span className="text-[9px] text-brand-500 font-bold">({displayedBank})</span>
+                            ) : null;
+                          })()}
                           {pair.receipt?.user_id === 'SHARED_POOL' && (
                             <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[8px] px-2 py-0.5 rounded-full font-black">POOL</span>
                           )}
@@ -589,7 +603,17 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                   <div className="flex items-center gap-6">
                     <div className="p-4 bg-red-50 dark:bg-red-500/10 rounded-2xl text-red-600"><Target size={20} /></div>
                     <div>
-                      <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{exp.merchant}</div>
+                      <div className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                        {exp.merchant}
+                        {(() => {
+                          const rDigits = exp.card_digits?.replace(/\D/g, '').slice(-4);
+                          const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
+                          const displayedBank = exp.bank || rMatch?.bank_name;
+                          return displayedBank ? (
+                            <span className="ml-2 text-[9px] text-brand-500 font-bold">({displayedBank})</span>
+                          ) : null;
+                        })()}
+                      </div>
                       <div className="text-[10px] text-red-600 font-bold uppercase mt-1">{exp.category} • {exp.date}</div>
                     </div>
                   </div>
@@ -616,7 +640,14 @@ const Reconciler: React.FC<ReconcilerProps> = ({
                     <div>
                       <div className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm">
                         {exp.merchant}
-                        {exp.bank && <span className="ml-2 text-[9px] text-brand-500 font-bold">({exp.bank})</span>}
+                        {(() => {
+                          const rDigits = exp.card_digits?.replace(/\D/g, '').slice(-4);
+                          const rMatch = bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === rDigits);
+                          const displayedBank = exp.bank || rMatch?.bank_name;
+                          return displayedBank ? (
+                            <span className="ml-2 text-[9px] text-brand-500 font-bold">({displayedBank})</span>
+                          ) : null;
+                        })()}
                       </div>
                       <div className="text-[10px] font-bold text-slate-400">
                         {exp.date} • {exp.category}
