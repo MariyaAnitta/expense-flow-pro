@@ -51,8 +51,10 @@ const sanitize = (data: any, seen = new WeakSet()): any => {
 };
 
 export const isHomeLocation = (log: any) => {
-  const dest = `${log.destination_country || ""} ${log.destination_city || ""}`.toLowerCase();
-  return /uae|emirates|dubai|united arab emirates|^ae\b/.test(dest);
+  if (!log) return false;
+  const dest = `${log.destination_country || ""} ${log.destination_city || ""}`.toLowerCase().trim();
+  // Matches AE, UAE, Dubai, United Arab Emirates, etc. regardless of position
+  return /\b(ae|uae|dubai|emirates|united arab emirates)\b/.test(dest);
 };
 
 const mapExpenseData = (data: any): Expense => {

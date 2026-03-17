@@ -194,10 +194,12 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         const fDate = new Date(f.departure_date || f.start_date);
         const fOrigin = (f.origin_country || "").toLowerCase();
 
-        // Match if countries are swapped (Reciprocal leg)
+        // Match if countries are swapped OR fallback for older logs without origin data
         const countryMatch = destCountry && (fOrigin.includes(destCountry) || destCountry.includes(fOrigin));
+        const dateMatch = fDate >= tripStart;
 
-        return countryMatch && fDate >= tripStart;
+        // If we have origin data, be strict. If missing (legacy), match the nearest following return.
+        return dateMatch && (fOrigin ? countryMatch : true);
       }) : null;
 
       const tripEndStr = returnLeg ? (returnLeg.departure_date || returnLeg.start_date) : (flight.return_date || flight.end_date || flight.start_date);
@@ -205,7 +207,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
 
       const tripDays = (returnLeg || hasInternalReturn)
         ? Math.max(1, Math.round((tripEnd.getTime() - tripStart.getTime()) / 86400000) + 1)
-        : (flight.days_spent || 1);
+        : (Number(flight.days_spent) || 1);
 
       processedFlightIds.add(flight.id);
       if (returnLeg) processedFlightIds.add(returnLeg.id);
@@ -230,6 +232,9 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
       // 1:1 FORENSIC MATCHING (Locks the receipt/transaction so it's not reused)
       const fMatch = getFinancialMatch(flight, 'flight', null, usedIds);
       const rMatch = returnLeg ? getFinancialMatch(returnLeg, 'flight', null, usedIds) : null;
+
+      const totalFlightAmt = (fMatch?.amount || 0) + (rMatch?.amount || 0);
+
       const hMatch = getFinancialMatch(
         linkedHotel || (linkedHotelExpense ? { start_date: linkedHotelExpense.date, provider_name: linkedHotelExpense.merchant, travel_type: 'accommodation' } as any : null),
         'accommodation',
@@ -237,7 +242,7 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         usedIds
       );
 
-      result.push({
+      const segment: JurisdictionSegment = {
         id: flight.id,
         country: flight.destination_country || "Unknown",
         city: flight.destination_city || "Various",
@@ -249,12 +254,15 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
         status: hMatch ? 'verified' : 'action_required',
         provider: returnLeg ? `${flight.provider_name} + ${returnLeg.provider_name}` : flight.provider_name,
         financials: {
-          flightAmt: (fMatch?.amount || 0) + (rMatch?.amount || 0) || undefined,
+          flightAmt: totalFlightAmt > 0 ? totalFlightAmt : undefined,
           flightCurr: fMatch?.currency || rMatch?.currency || 'AED',
           hotelAmt: hMatch?.amount,
           hotelCurr: hMatch?.currency
         }
-      });
+      };
+
+      console.log(`[TravelTracker] Segment for ${segment.country}:`, segment);
+      result.push(segment);
     });
 
     // 3. PROCESS STANDALONE HOTELS (Anchors without flights)
@@ -500,8 +508,8 @@ const TravelTracker: React.FC<TravelTrackerProps> = ({ logs, expenses, period })
                     <div>
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Movement Proof</p>
                       <p className="text-[10px] font-bold dark:text-slate-300">
-                        {segment.provider || (segment.flight ? segment.flight.provider_name : "No travel doc found")}
-                        {Boolean(segment.financials?.flightAmt) && (
+                        {String(segment.provider || (segment.flight ? segment.flight.provider_name : "No travel doc found"))}
+                        {!!segment.financials?.flightAmt && (
                           <span className="ml-2 text-brand-500 text-[8px] font-black">
                             {segment.financials?.flightCurr} {segment.financials?.flightAmt?.toLocaleString()}
                           </span>
