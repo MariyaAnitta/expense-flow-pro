@@ -164,7 +164,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         (filterSource === "Credit Card Statement" && e.source === "credit_card_statement") ||
         (filterSource === "Telegram Bot" && e.source === "telegram") ||
         (filterSource === "WhatsApp Bot" && e.source === "whatsapp") ||
-        (filterSource === "Email Alert" && e.source === "email");
+        (filterSource === "Email Alert" && (e.source === "email" || e.source === "forwarded_email"));
       if (!matchesSource) return false;
 
       // 6. Bank Filter (Hierarchy of Truth: Registry > Manual)
@@ -295,11 +295,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500"><CreditCard size={20} /></div>
             <div className="text-right">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Financial Vault</p>
-              <h4 className="text-3xl font-black tracking-tighter">{(stats.sources.credit_card_statement || 0) + (stats.sources.bank_statement || 0) + (stats.sources.email || 0)}</h4>
+              <h4 className="text-3xl font-black tracking-tighter">{(stats.sources.credit_card_statement || 0) + (stats.sources.bank_statement || 0) + (stats.sources.email || 0) + (stats.sources.forwarded_email || 0)}</h4>
             </div>
           </div>
           <div className="mt-auto w-full h-1 bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, ((stats.sources.credit_card_statement || 0) + (stats.sources.bank_statement || 0) + (stats.sources.email || 0)) / (stats.count || 1) * 100)}%` }}></div>
+            <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, ((stats.sources.credit_card_statement || 0) + (stats.sources.bank_statement || 0) + (stats.sources.email || 0) + (stats.sources.forwarded_email || 0)) / (stats.count || 1) * 100)}%` }}></div>
           </div>
         </div>
       </div>
