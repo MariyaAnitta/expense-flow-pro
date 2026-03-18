@@ -213,7 +213,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       case 'credit_card_statement': return <CreditCard size={18} className="text-indigo-500" />;
       case 'bank_statement': return <Database size={18} className="text-amber-500" />;
       case 'telegram': return <Send size={18} className="text-sky-500" />;
-      case 'email': return <Mail size={18} className="text-pink-500" />;
+      case 'email':
+      case 'forwarded_email': return <Mail size={18} className="text-pink-500" />;
       case 'whatsapp': return <MessageCircle size={18} className="text-emerald-500" />;
       default: return <Search size={18} />;
     }
@@ -444,39 +445,46 @@ const Dashboard: React.FC<DashboardProps> = ({
                               </button>
                             </div>
                           ) : (
-                            <span
-                              className={`text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight ${session?.role === 'admin' ? 'cursor-pointer hover:text-brand-600 transition-colors' : ''}`}
-                              onClick={() => {
-                                if (session?.role === 'admin') {
-                                  setEditingIdentityId(e.id);
-                                  setTempIdentity(e.merchant);
-                                }
-                              }}
-                            >
-                              {e.merchant}
-                              {session?.role === 'admin' && <Edit3 size={10} className="inline ml-2 opacity-0 group-hover:opacity-40" />}
-                              {(() => {
-                                const mDigits = e.card_digits?.replace(/\D/g, '').slice(-4);
-                                const registryMatch = mDigits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits) : null;
+                            <div className="flex flex-col">
+                              <span
+                                className={`text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-tight ${session?.role === 'admin' ? 'cursor-pointer hover:text-brand-600 transition-colors' : ''}`}
+                                onClick={() => {
+                                  if (session?.role === 'admin') {
+                                    setEditingIdentityId(e.id);
+                                    setTempIdentity(e.merchant);
+                                  }
+                                }}
+                              >
+                                {e.merchant}
+                                {session?.role === 'admin' && <Edit3 size={10} className="inline ml-2 opacity-0 group-hover:opacity-40" />}
+                                {(() => {
+                                  const mDigits = e.card_digits?.replace(/\D/g, '').slice(-4);
+                                  const registryMatch = mDigits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits) : null;
 
-                                // Priority 1: Bank Registry (Verified Proof)
-                                if (registryMatch) {
-                                  return (
-                                    <span className="ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-lg text-[10px] font-black border border-brand-100 dark:border-brand-500/20 shadow-sm align-middle">
-                                      <Zap size={10} className="fill-brand-600" />
-                                      {registryMatch.bank_name}
-                                    </span>
-                                  );
-                                }
+                                  // Priority 1: Bank Registry (Verified Proof)
+                                  if (registryMatch) {
+                                    return (
+                                      <span className="ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-lg text-[10px] font-black border border-brand-100 dark:border-brand-500/20 shadow-sm align-middle">
+                                        <Zap size={10} className="fill-brand-600" />
+                                        {registryMatch.bank_name}
+                                      </span>
+                                    );
+                                  }
 
-                                // Priority 2: Manual Selection (Intent)
-                                if (e.bank) {
-                                  return <span className="ml-2 text-[11px] text-slate-500 font-bold uppercase tracking-tight italic">({e.bank})</span>;
-                                }
+                                  // Priority 2: Manual Selection (Intent)
+                                  if (e.bank) {
+                                    return <span className="ml-2 text-[11px] text-slate-500 font-bold uppercase tracking-tight italic">({e.bank})</span>;
+                                  }
 
-                                return null;
-                              })()}
-                            </span>
+                                  return null;
+                                })()}
+                              </span>
+                              {e.forwarded_from && (
+                                <span className="text-[10px] font-bold text-pink-600/70 dark:text-pink-400/70 uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                                  <Mail size={10} /> Via: {e.forwarded_from}
+                                </span>
+                              )}
+                            </div>
                           )}
                           {isVerified && (
                             <span className="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border border-emerald-100 dark:border-emerald-500/20">

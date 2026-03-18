@@ -149,6 +149,7 @@ const ExpenseRecordSchema = z.object({
     paid_by: z.string().optional().describe("Who paid (Employee vs Company)"),
     payment_method: z.string().optional().describe("Payment type (Card, Cash)"),
     cd: z.string().optional().describe("Last 4 digits of the payment card if visible on the receipt"),
+    forwarded_from: z.string().optional().describe("Original sender's email if this is a forwarded message"),
     notes: z.string().optional().describe("Any additional context")
 });
 
@@ -177,6 +178,7 @@ async function runExpenseAgent(content: string, source: string) {
     - DATE INTERPRETATION: Interpret source dates as DD/MM/YYYY. (e.g., 01/12 is December 1st). 
     - DATE OUTPUT: ALWAYS return YYYY-MM-DD.
     - CARD DIGITS: If you see the last 4 digits of a payment card (e.g. **** 4477), extract them into 'cd'.
+    - FORWARDED EMAIL: If the document appears to be a forwarded email, extract the ORIGINAL SENDER's email address into 'forwarded_from'. Look for headers like "From: ...", "Forwarded message", or "Sent by".
     - If the document mentions travel (flight, hotel, visa), 'travel_logs' MUST NOT BE EMPTY.
     
     CATEGORIES: Transport, Meals, Lodging, Office, Utilities, Salary, Transfer, General.
@@ -248,6 +250,7 @@ async function runBatchExpenseAgent(inputs: { content: string, source: string }[
     - HOTEL LOG RULES: type: 'accommodation', provider: Hotel Name, date: Check-in, end_date: Check-out.
     - FLIGHT LOG RULES: type: 'flight', provider: Airline, date: Departure, end_date: Return, origin_country: Departure Country, dest_country: Arrival Country.
     - CARD DIGITS: If you see the last 4 digits of a payment card (e.g. Card: **** 4477), extract them into 'cd'.
+    - FORWARDED EMAIL: If any document is a forwarded email, extract the ORIGINAL SENDER's email into 'forwarded_from'.
     - CONSOLIDATION: One document = ONE record. Merge all flight legs.
     - DATES: 'date' = departure, 'end_date' = return.
   `;

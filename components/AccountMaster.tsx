@@ -276,6 +276,12 @@ const AccountMaster: React.FC<AccountMasterProps> = ({
                                                         <Edit3 size={12} className="opacity-0 group-hover:opacity-40" />
                                                     </div>
 
+                                                    {expense.forwarded_from && (
+                                                        <div className="flex items-center gap-1.5 px-2 py-0.5 mt-1 bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-lg text-[9px] font-black border border-pink-100 dark:border-pink-500/20 shadow-sm w-fit uppercase tracking-wider">
+                                                            <Mail size={10} /> Via: {expense.forwarded_from}
+                                                        </div>
+                                                    )}
+
                                                     {(() => {
                                                         const mDigits = expense.card_digits?.replace(/\D/g, '').slice(-4);
                                                         const registryMatch = mDigits ? bankMappings.find(m => m.card_digits.replace(/\D/g, '').slice(-4) === mDigits) : null;
