@@ -12,6 +12,7 @@ import {
   deleteDoc,
   doc,
   setDoc,
+  getDoc,
   getDocs,
   where,
   Timestamp,
@@ -479,4 +480,22 @@ export const saveBankMapping = async (mapping: { card_digits: string, bank_name:
 
 export const deleteBankMapping = async (id: string) => {
   return await deleteDoc(doc(db, 'bank_registry', id));
+};
+
+// --- MONTHLY CURRENCY RATES (Centralized Organization-Wide) ---
+export const getMonthlyRates = async (monthKey: string): Promise<any | null> => {
+  const docRef = doc(db, 'monthly_rates', monthKey);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    return snap.data();
+  }
+  return null;
+};
+
+export const saveMonthlyRates = async (monthKey: string, rates: any) => {
+  const docRef = doc(db, 'monthly_rates', monthKey);
+  return await setDoc(docRef, {
+    ...rates,
+    updated_at: new Date().toISOString()
+  }, { merge: true });
 };

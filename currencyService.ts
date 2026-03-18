@@ -24,36 +24,52 @@ const getMonthKey = (dateStr?: string): string => {
   return `${year}-${month}`;
 };
 
+import { getMonthlyRates, saveMonthlyRates } from './firebaseService';
+
 /**
  * Fetches the official exchange rate for a specific month.
- * Logic: Checks session -> Checks localStorage -> Fetches from API.
- * The API always returns current live rates, which effectively becomes the "Fixed Rate"
- * for whichever month the app is currently running in when it first fetches.
- * For historical mismatch (e.g. looking at a 2023 receipt), if there is no cache,
- * it will pull today's rate and lock it as that month's rate.
+ * Logic: Checks session -> Checks Firestore -> Fetches from API -> Syncs to Firestore.
+ * This ensures that the first user to visit the app in a new month "pins" the 
+ * rates for the entire organization for that monthKey.
  */
 export const getExchangeRates = async (dateStr?: string): Promise<ExchangeRates | null> => {
   const monthKey = getMonthKey(dateStr);
   const cacheKey = `expenseflow_rates_${monthKey}`;
 
-  // 1. Check in-memory session cache
+  // 1. Check in-memory session cache (Fastest)
   if (currentSessionRates[monthKey]) {
     return currentSessionRates[monthKey];
   }
 
-  // 2. Check persistent localStorage cache
+  // 2. Check Firestore (Organization-Wide Pinned Rates)
+  try {
+    const pinnedRates = await getMonthlyRates(monthKey);
+    if (pinnedRates) {
+      const ratesData: ExchangeRates = {
+        rates: pinnedRates.rates,
+        timestamp: pinnedRates.timestamp
+      };
+      currentSessionRates[monthKey] = ratesData;
+      localStorage.setItem(cacheKey, JSON.stringify(ratesData)); // Local sync
+      return ratesData;
+    }
+  } catch (e) {
+    console.warn('Firestore rate lookup failed, falling back to local/API', e);
+  }
+
+  // 3. Fallback: Check persistent localStorage cache (Offline/Local)
   const cachedContent = localStorage.getItem(cacheKey);
   if (cachedContent) {
     try {
       const parsed: ExchangeRates = JSON.parse(cachedContent);
-      currentSessionRates[monthKey] = parsed; // Add to session cache
+      currentSessionRates[monthKey] = parsed;
       return parsed;
     } catch (e) {
       console.warn('Failed to parse cached rates', e);
     }
   }
 
-  // 3. Fetch fresh rates and permanently lock them for this monthKey
+  // 4. Final: Fetch fresh rates and PIN THEM for the entire organization
   try {
     const response = await fetch(BASE_URL);
     if (!response.ok) throw new Error('Failed to fetch exchange rates');
@@ -64,13 +80,17 @@ export const getExchangeRates = async (dateStr?: string): Promise<ExchangeRates 
       timestamp: Date.now(),
     };
 
+    // Pin for everyone
+    await saveMonthlyRates(monthKey, ratesData);
+    
+    // Sync local
     localStorage.setItem(cacheKey, JSON.stringify(ratesData));
     currentSessionRates[monthKey] = ratesData;
     return ratesData;
   } catch (error) {
     console.error(`Currency Service Error for ${monthKey}:`, error);
 
-    // 4. Fallback: If offline/failed, try to find ANY recent cached month
+    // 5. Emergency Fallback: Find ANY recent cached month in localStorage
     const fallbackKey = Object.keys(localStorage).find(k => k.startsWith('expenseflow_rates_'));
     if (fallbackKey) {
       const fallbackData = localStorage.getItem(fallbackKey);

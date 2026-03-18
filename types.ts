@@ -1,5 +1,17 @@
 export type ExpenseSource = 'receipt' | 'credit_card_statement' | 'bank_statement' | 'telegram' | 'whatsapp' | 'email' | 'web_upload' | 'forwarded_email';
 
+export interface ExchangeRates {
+  rates: Record<string, number>;
+  timestamp: number;
+}
+
+export interface MonthlyRates {
+  id: string; // The monthKey (e.g. '2026-03')
+  rates: Record<string, number>;
+  timestamp: number;
+  updated_at?: string;
+}
+
 export type TravelLogStatus = 'Complete' | 'Open - Awaiting return' | 'Incomplete - Outbound missing';
 
 export interface TravelLog {
