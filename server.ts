@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 import { genkit, z } from 'genkit';
 import { vertexAI, gemini20Flash } from '@genkit-ai/vertexai';
 import { logError } from './logger.js';
+import { createClient } from '@supabase/supabase-js';
+import mime from 'mime-types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,6 +91,53 @@ const ai = genkit({
     model: gemini20Flash,
 });
 
+// --- SUPABASE STORAGE LOGIC ---
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey) : null;
+
+async function uploadToSupabase(content: string, source: string): Promise<string | null> {
+    if (!supabase) return null;
+    try {
+        const trimmed = content.trim();
+        let jsonStr = trimmed;
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+            try { jsonStr = JSON.parse(trimmed); } catch (e) { }
+        }
+        if (jsonStr.startsWith('{')) {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.data && parsed.mimeType) {
+                let base64Data = parsed.data;
+                if (base64Data.startsWith('data:')) {
+                    base64Data = base64Data.split(',')[1];
+                }
+                const buffer = Buffer.from(base64Data, 'base64');
+                const ext = mime.extension(parsed.mimeType) || 'bin';
+                
+                const safeSource = source.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+                const filename = `${Date.now()}_${safeSource}_${Math.random().toString(36).substring(7)}.${ext}`;
+                
+                console.log(`[Supabase] Uploading ${filename} (${parsed.mimeType})`);
+                
+                const { error } = await supabase.storage.from('receipt-storage').upload(filename, buffer, {
+                    contentType: parsed.mimeType
+                });
+                
+                if (error) {
+                    console.error("[Supabase] Upload error:", error);
+                    return null;
+                }
+                
+                const { data: publicUrlData } = supabase.storage.from('receipt-storage').getPublicUrl(filename);
+                return publicUrlData.publicUrl;
+            }
+        }
+    } catch (e) {
+        console.error("[Supabase] Failed to upload:", e);
+    }
+    return null;
+}
+
 // --- HELPERS ---
 function toParts(content: string): any[] {
     const preview = content.substring(0, 100).replace(/\n/g, ' ');
@@ -150,7 +199,8 @@ const ExpenseRecordSchema = z.object({
     payment_method: z.string().optional().describe("Payment type (Card, Cash)"),
     cd: z.string().optional().describe("Last 4 digits of the payment card if visible on the receipt"),
     forwarded_from: z.string().optional().describe("Original sender's email if this is a forwarded message"),
-    notes: z.string().optional().describe("Any additional context")
+    notes: z.string().optional().describe("Any additional context"),
+    document_url: z.string().optional().describe("Link to original source document (Supabase)")
 });
 
 const ExtractionOutputSchema = z.object({
@@ -397,7 +447,14 @@ app.post('/api/generate', async (req, res) => {
     try {
         const { content, source } = req.body;
         console.log(`[API] POST /api/generate - Source: ${source}`);
+        
+        const document_url = await uploadToSupabase(content, source);
         const result = await runExpenseAgent(content, source);
+        
+        if (document_url && result.expenses && result.expenses.length > 0) {
+            result.expenses[0].document_url = document_url;
+        }
+        
         res.json(result);
     } catch (error: any) {
         console.error("Agent Error:", error);
@@ -418,7 +475,22 @@ app.post('/api/generate-batch', async (req, res) => {
             return res.status(400).json({ error: "Empty batch inputs" });
         }
 
+        const uploadPromises = inputs.map((inp: any) => uploadToSupabase(inp.content, inp.source));
+        const documentUrls = await Promise.all(uploadPromises);
+
         const result = await runBatchExpenseAgent(inputs);
+        
+        if (result.results && Array.isArray(result.results)) {
+            result.results.forEach((resItem: any, idx: number) => {
+               const docUrl = documentUrls[idx];
+               if (docUrl) {
+                   if (resItem.expenses && resItem.expenses.length > 0) {
+                       resItem.expenses.forEach((exp: any) => exp.document_url = docUrl);
+                   }
+               }
+            });
+        }
+
         console.log(`[API] Returning ${result.results?.length} batch results.`);
         res.json(result);
     } catch (error: any) {

@@ -24,7 +24,8 @@ import {
   Edit3,
   Check,
   MessageCircle,
-  Zap
+  Zap,
+  Eye
 } from 'lucide-react';
 import { getExchangeRates, convertToBaseCurrency, getCurrencySymbol, ExchangeRates } from '../currencyService';
 import { UserSession } from '../authService';
@@ -642,15 +643,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                     </td>
                     <td className="px-12 py-6 text-right">
-                      {e.is_verified && !session?.isAdmin ? (
-                        <div className="p-3 text-slate-300 cursor-not-allowed">
-                          <Lock size={18} />
-                        </div>
-                      ) : (
-                        <button onClick={() => onDelete(e.id)} className="p-3 text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all active:scale-95">
-                          <Trash2 size={20} />
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                        {e.document_url && (
+                          <a href={e.document_url} target="_blank" rel="noopener noreferrer" className="p-2 text-brand-500 hover:bg-brand-50 rounded-lg flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-all">
+                            <Eye size={14} /> View
+                          </a>
+                        )}
+                        {e.is_verified && !session?.isAdmin ? (
+                          <div className="p-2 text-slate-300 cursor-not-allowed">
+                            <Lock size={16} />
+                          </div>
+                        ) : (
+                          <button onClick={() => onDelete(e.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all active:scale-95">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

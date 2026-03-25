@@ -110,6 +110,7 @@ export interface Expense {
   reconciled_at?: string;
   card_digits?: string; // Extracted last 4 digits
   forwarded_from?: string; // Original sender of a forwarded email
+  document_url?: string; // Link to original source document (Supabase)
 }
 
 export interface ReconciliationResult {
