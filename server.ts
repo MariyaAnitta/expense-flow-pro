@@ -156,15 +156,24 @@ function toParts(content: string): any[] {
             if (parsed.data && parsed.mimeType) {
                 console.log(`[Helper] 📸 MULTIMODAL SUCCESS: Found ${parsed.mimeType}`);
                 
-                // --- GEMINI MIME GUARD ---
+                // --- GEMINI MIME GUARD & TEXT FALLBACK ---
                 const supportedMimes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'];
                 const isSupported = supportedMimes.some(m => parsed.mimeType.toLowerCase().startsWith(m)) || 
                                    parsed.mimeType.startsWith('image/') || 
                                    parsed.mimeType.startsWith('text/');
 
                 if (!isSupported) {
-                    console.warn(`[Helper] ⚠️ Gemini does not support ${parsed.mimeType}. Skipping binary content for AI.`);
-                    return [{ text: `[Attachment: ${parsed.mimeType} - Binary content skipped for AI analysis]` }];
+                    console.warn(`[Helper] ⚠️ Gemini does not support ${parsed.mimeType}. Falling back to Text representation for AI.`);
+                    
+                    // BEST OF BOTH WORLDS: Send the binary as UTF-8 text to Gemini 
+                    // This allows Gemini to "read" readable strings embedded in the binary (.msg) file
+                    try {
+                        const buffer = Buffer.from(parsed.data, 'base64');
+                        const textData = buffer.toString('utf8').replace(/[^\x20-\x7E\n\r\t]/g, ' '); // Clean binary noise
+                        return [{ text: `[Attachment: ${parsed.mimeType}]\n\n--- FILE CONTENT START ---\n${textData}\n--- FILE CONTENT END ---` }];
+                    } catch (err) {
+                        return [{ text: `[Attachment: ${parsed.mimeType} - Binary content skipped for AI analysis]` }];
+                    }
                 }
 
                 const url = parsed.data.startsWith('data:') ? parsed.data : `data:${parsed.mimeType};base64,${parsed.data}`;
@@ -460,7 +469,17 @@ app.post('/api/generate', async (req, res) => {
         const { content, source } = req.body;
         console.log(`[API] POST /api/generate - Source: ${source}`);
         
-        const document_url = await uploadToSupabase(content, source);
+        // ONLY UPLOAD TO SUPABASE IF NOT A BANK/CREDIT STATEMENT
+        const isStatement = source === 'bank_statement' || source === 'credit_card_statement';
+        let document_url = null;
+        
+        if (!isStatement) {
+            console.log(`[API] 📤 Uploading proof document to Supabase...`);
+            document_url = await uploadToSupabase(content, source);
+        } else {
+            console.log(`[API] 📁 Skipping Supabase upload for ${source} (Statement only)`);
+        }
+
         const result = await runExpenseAgent(content, source);
         
         if (document_url && result.expenses && result.expenses.length > 0) {
@@ -487,8 +506,14 @@ app.post('/api/generate-batch', async (req, res) => {
             return res.status(400).json({ error: "Empty batch inputs" });
         }
 
-        const uploadPromises = inputs.map((inp: any) => uploadToSupabase(inp.content, inp.source));
-        const documentUrls = await Promise.all(uploadPromises);
+        const documentUrls = await Promise.all(inputs.map(async (inp: any) => {
+            const isStatement = inp.source === 'bank_statement' || inp.source === 'credit_card_statement';
+            if (!isStatement) {
+                return await uploadToSupabase(inp.content, inp.source);
+            }
+            console.log(`[API-Batch] Skipping Supabase upload for ${inp.source}`);
+            return null;
+        }));
 
         const result = await runBatchExpenseAgent(inputs);
         
