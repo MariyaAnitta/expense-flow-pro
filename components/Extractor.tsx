@@ -35,6 +35,7 @@ interface FilePreview {
   data: string;
   rawFile: File;
   isEmail: boolean;
+  isMsg: boolean;
   isCsv: boolean;
   rowCount?: number;
   sizeLabel: string;
@@ -87,7 +88,8 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
     setSuccessCount(null);
 
     selectedFiles.forEach(file => {
-      const isEmail = file.name.endsWith('.eml') || file.name.endsWith('.msg') || file.type === 'message/rfc822';
+      const isEml = file.name.endsWith('.eml') || file.type === 'message/rfc822';
+      const isMsg = file.name.endsWith('.msg');
       const isCsv = file.name.endsWith('.csv') || file.type === 'text/csv';
       const reader = new FileReader();
 
@@ -111,7 +113,8 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
             type: file.type,
             data: processedData,
             rawFile: file,
-            isEmail: isEmail,
+            isEmail: isEml,
+            isMsg: isMsg,
             isCsv: isCsv,
             rowCount,
             sizeLabel: formatSize(file.size)
@@ -119,7 +122,7 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
         ]);
       };
 
-      if (isEmail || isCsv) {
+      if (isEml || isCsv) {
         reader.readAsText(file);
       } else {
         reader.readAsDataURL(file);
