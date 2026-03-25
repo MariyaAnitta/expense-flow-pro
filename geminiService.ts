@@ -72,7 +72,8 @@ export const batchExtractAllData = async (
         paid_by: item.paid_by,
         payment_method: item.payment_method,
         card_digits: item.cd || "",
-        notes: item.notes
+        notes: item.notes,
+        document_url: item.document_url
       }));
 
       const docId = `doc-${Date.now()}-${batchIdx}`;
