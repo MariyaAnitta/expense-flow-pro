@@ -154,7 +154,19 @@ function toParts(content: string): any[] {
         if (jsonStr.startsWith('{')) {
             const parsed = JSON.parse(jsonStr);
             if (parsed.data && parsed.mimeType) {
-                console.log(`[Helper] 📸 MULTIMODAL SUCCESS: Found ${parsed.mimeType} (base64 snippet: ${parsed.data.substring(0, 20)}...)`);
+                console.log(`[Helper] 📸 MULTIMODAL SUCCESS: Found ${parsed.mimeType}`);
+                
+                // --- GEMINI MIME GUARD ---
+                const supportedMimes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'];
+                const isSupported = supportedMimes.some(m => parsed.mimeType.toLowerCase().startsWith(m)) || 
+                                   parsed.mimeType.startsWith('image/') || 
+                                   parsed.mimeType.startsWith('text/');
+
+                if (!isSupported) {
+                    console.warn(`[Helper] ⚠️ Gemini does not support ${parsed.mimeType}. Skipping binary content for AI.`);
+                    return [{ text: `[Attachment: ${parsed.mimeType} - Binary content skipped for AI analysis]` }];
+                }
+
                 const url = parsed.data.startsWith('data:') ? parsed.data : `data:${parsed.mimeType};base64,${parsed.data}`;
                 return [{ media: { url, contentType: parsed.mimeType } }];
             } else {
