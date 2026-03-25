@@ -148,12 +148,16 @@ const Extractor: React.FC<ExtractorProps> = ({ onExtract, bankMappings }) => {
       const p = previews[i];
       setProcessingStatus(`Analyzing ${p.name}...`);
 
-      let extractionInput: string | { data: string; mimeType: string };
+      let extractionInput: string | { data: string; mimeType: string; name?: string };
       if (p.isEmail || p.isCsv) {
         extractionInput = p.data;
       } else {
         const base64Data = p.data.split(',')[1] || '';
-        extractionInput = { data: base64Data, mimeType: p.type || 'application/octet-stream' };
+        extractionInput = { 
+          data: base64Data, 
+          mimeType: p.type || 'application/octet-stream',
+          name: p.name // Pass original filename
+        };
       }
 
       inputs.push({

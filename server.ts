@@ -112,10 +112,11 @@ async function uploadToSupabase(content: string, source: string): Promise<string
                     base64Data = base64Data.split(',')[1];
                 }
                 const buffer = Buffer.from(base64Data, 'base64');
-                const ext = mime.extension(parsed.mimeType) || 'bin';
                 
-                const safeSource = source.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
-                const filename = `${Date.now()}_${safeSource}_${Math.random().toString(36).substring(7)}.${ext}`;
+                // Use original name if provided, otherwise guess from MIME
+                const originalName = parsed.name || `document.${mime.extension(parsed.mimeType) || 'bin'}`;
+                const safeSource = source.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 10);
+                const filename = `${Date.now()}_${safeSource}_${originalName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
                 
                 console.log(`[Supabase] Uploading ${filename} (${parsed.mimeType})`);
                 
