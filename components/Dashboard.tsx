@@ -25,7 +25,8 @@ import {
   Check,
   MessageCircle,
   Zap,
-  Eye
+  Eye,
+  Download
 } from 'lucide-react';
 import { getExchangeRates, convertToBaseCurrency, getCurrencySymbol, ExchangeRates } from '../currencyService';
 import { UserSession } from '../authService';
@@ -645,8 +646,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <td className="px-12 py-6 text-right">
                       <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
                         {e.document_url && (
-                          <a href={e.document_url} target="_blank" rel="noopener noreferrer" className="p-2 text-brand-500 hover:bg-brand-50 rounded-lg flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-all">
-                            <Eye size={14} /> View
+                          <a 
+                            href={`${e.document_url}${e.document_url.includes('?') ? '&' : '?'}download=`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            download 
+                            className="p-2 text-brand-500 hover:bg-brand-50 rounded-lg flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-all"
+                            title="Download Receipt"
+                          >
+                            <Download size={14} /> Download
                           </a>
                         )}
                         {e.is_verified && !session?.isAdmin ? (
